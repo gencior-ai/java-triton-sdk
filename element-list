@@ -1,0 +1,9 @@
+com.gencior
+com.gencior.config
+com.gencior.core
+com.gencior.core.pojo
+com.gencior.exceptions
+com.gencior.grpc
+com.gencior.http
+grpc.health.v1
+inference
