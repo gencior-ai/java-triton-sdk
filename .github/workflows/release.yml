@@ -1,0 +1,270 @@
+name: Release
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Create Release and Publish
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate GitFlow branch
+        run: |
+          SOURCE="${{ github.head_ref }}"
+          if [[ ! "$SOURCE" =~ ^(release|hotfix)/ ]]; then
+            echo "::error::GitFlow violation: Only release/* or hotfix/* branches can merge to main"
+            echo "::error::Source branch '$SOURCE' is not allowed"
+            exit 1
+          fi
+          echo "✓ GitFlow validated: merging from $SOURCE"
+
+      - name: Extract version from branch name
+        id: extract_version
+        run: |
+          SOURCE="${{ github.head_ref }}"
+          echo "Source branch: $SOURCE"
+
+          if [[ "$SOURCE" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            IS_PRERELEASE=false
+          elif [[ "$SOURCE" =~ ^hotfix/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            IS_PRERELEASE=false
+          else
+            echo "::error::Invalid branch name format. Expected release/X.Y.Z or hotfix/X.Y.Z"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Configure Maven settings for GitHub Packages
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Update POM version
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          echo "Setting POM version to $VERSION"
+          mvn versions:set -DnewVersion=$VERSION -B
+
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current POM version: $CURRENT_VERSION"
+
+          if [ "$CURRENT_VERSION" != "$VERSION" ]; then
+            echo "::error::Version mismatch: expected $VERSION but got $CURRENT_VERSION"
+            exit 1
+          fi
+
+      - name: Build and verify
+        run: mvn clean verify -B
+
+      - name: Deploy to GitHub Packages
+        run: mvn deploy -DskipTests -B
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Javadoc
+        run: |
+          echo "Generating Javadoc for version ${{ steps.extract_version.outputs.version }}"
+          mvn javadoc:javadoc -B
+
+          # Vérifier que la Javadoc a été générée
+          if [ ! -d "target/site/apidocs" ]; then
+            echo "::error::Javadoc generation failed - no apidocs directory"
+            exit 1
+          fi
+
+          echo "✓ Javadoc generated successfully"
+          ls -lh target/site/apidocs/
+
+      - name: Deploy Javadoc to GitHub Pages
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+
+          # Clone gh-pages branch ou créer si n'existe pas
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            echo "Cloning existing gh-pages branch"
+            git clone --depth 1 --branch gh-pages https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git gh-pages
+          else
+            echo "Creating new gh-pages branch"
+            mkdir gh-pages
+            cd gh-pages
+            git init
+            git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            git checkout -b gh-pages
+            cd ..
+          fi
+
+          # Copier Javadoc
+          rm -rf gh-pages/*
+          cp -r target/site/apidocs/* gh-pages/
+
+          # Créer index.html si nécessaire
+          if [ ! -f "gh-pages/index.html" ]; then
+            echo "No index.html found, using package index"
+            cp gh-pages/index-all.html gh-pages/index.html 2>/dev/null || true
+          fi
+
+          # Ajouter README
+          cat > gh-pages/README.md << EOF
+          # Java Triton SDK - Javadoc
+
+          Documentation for version $VERSION
+
+          Generated: $(date)
+
+          [View Javadoc](https://$(echo "${{ github.repository }}" | cut -d'/' -f1).github.io/$(echo "${{ github.repository }}" | cut -d'/' -f2)/)
+          EOF
+
+          # Commit et push
+          cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --staged --quiet; then
+            echo "No changes to Javadoc"
+          else
+            git commit -m "Update Javadoc for version $VERSION"
+            git push origin gh-pages
+            echo "✓ Javadoc deployed to GitHub Pages"
+          fi
+
+          cd ..
+
+      - name: Create and push tag
+        run: |
+          TAG="${{ steps.extract_version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          JAVADOC_URL="https://${OWNER}.github.io/${REPO}/"
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, generating full history"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from $PREV_TAG to HEAD"
+            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          cat > changelog.md << EOF
+          ## Changes in $VERSION
+
+          $CHANGELOG
+
+          ### Documentation
+
+          - 📘 [Javadoc API Documentation]($JAVADOC_URL)
+
+          ### Installation
+
+          Add to your \`pom.xml\`:
+
+          \`\`\`xml
+          <dependency>
+              <groupId>com.gencior</groupId>
+              <artifactId>java-triton-sdk</artifactId>
+              <version>$VERSION</version>
+          </dependency>
+          \`\`\`
+
+          And configure GitHub Packages repository:
+
+          \`\`\`xml
+          <repositories>
+              <repository>
+                  <id>github</id>
+                  <url>https://maven.pkg.github.com/${OWNER}/java-triton-sdk</url>
+              </repository>
+          </repositories>
+          \`\`\`
+
+          **Note:** GitHub Packages requires authentication. See [GitHub Packages documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry) for setup instructions.
+          EOF
+
+          echo "changelog-file=changelog.md" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.extract_version.outputs.tag }}
+          name: Release ${{ steps.extract_version.outputs.version }}
+          body_path: changelog.md
+          draft: false
+          prerelease: ${{ steps.extract_version.outputs.is_prerelease }}
+          files: |
+            target/*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        if: success()
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          TAG="${{ steps.extract_version.outputs.tag }}"
+          OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+
+          echo "✓ Successfully released version $VERSION"
+          echo "✓ Git tag $TAG created"
+          echo "✓ Package published to GitHub Packages"
+          echo "✓ Javadoc deployed to GitHub Pages"
+          echo "✓ GitHub Release created"
+          echo ""
+          echo "View release: ${{ github.server_url }}/${{ github.repository }}/releases/tag/$TAG"
+          echo "View package: ${{ github.server_url }}/${{ github.repository }}/packages"
+          echo "View Javadoc: https://${OWNER}.github.io/${REPO}/"
+
+      - name: Failure notification
+        if: failure()
+        run: |
+          echo "::error::Release failed! Check the logs above for details."
+          echo "::error::Common issues:"
+          echo "::error::  - Maven build failures"
+          echo "::error::  - Version mismatch"
+          echo "::error::  - GitHub Packages authentication"
+          echo "::error::  - Git tag already exists"
