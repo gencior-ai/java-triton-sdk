@@ -1,9 +1,9 @@
-com.gencior
-com.gencior.config
-com.gencior.core
-com.gencior.core.pojo
-com.gencior.exceptions
-com.gencior.grpc
-com.gencior.http
+com.gencior.triton
+com.gencior.triton.config
+com.gencior.triton.core
+com.gencior.triton.core.pojo
+com.gencior.triton.exceptions
+com.gencior.triton.grpc
+com.gencior.triton.http
 grpc.health.v1
 inference
