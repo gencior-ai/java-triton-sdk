@@ -38,20 +38,29 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 /**
- * gRPC-based implementation of the TritonClient for communicating with NVIDIA Triton Inference Server.
+ * gRPC-based implementation of the TritonClient for communicating with NVIDIA
+ * Triton Inference Server.
  *
- * <p>This class provides a high-performance client implementation using gRPC (gRPC Remote Procedure Call)
- * for synchronous and asynchronous communication with Triton. It handles all aspects of client-server
- * interaction including connection management, request timeout handling, and response parsing.
+ * <p>
+ * This class provides a high-performance client implementation using gRPC (gRPC
+ * Remote Procedure Call) for synchronous and asynchronous communication with
+ * Triton. It handles all aspects of client-server interaction including
+ * connection management, request timeout handling, and response parsing.
  *
  * <h2>Features:</h2>
  * <ul>
- *   <li><strong>Synchronous Inference:</strong> Blocking inference requests via {@link #infer(String, List)}</li>
- *   <li><strong>Asynchronous Inference:</strong> Non-blocking inference with CompletableFuture via {@link #inferAsync(String, List)}</li>
- *   <li><strong>Server Monitoring:</strong> Health checks and availability queries</li>
- *   <li><strong>Model Management:</strong> Load/unload models, query metadata and statistics</li>
- *   <li><strong>Automatic Timeouts:</strong> Configurable per-request timeouts via {@link TritonClientConfig}</li>
- *   <li><strong>Error Handling:</strong> Graceful handling of gRPC errors with optional verbose logging</li>
+ * <li><strong>Synchronous Inference:</strong> Blocking inference requests via
+ * {@link #infer(String, List)}</li>
+ * <li><strong>Asynchronous Inference:</strong> Non-blocking inference with
+ * CompletableFuture via {@link #inferAsync(String, List)}</li>
+ * <li><strong>Server Monitoring:</strong> Health checks and availability
+ * queries</li>
+ * <li><strong>Model Management:</strong> Load/unload models, query metadata and
+ * statistics</li>
+ * <li><strong>Automatic Timeouts:</strong> Configurable per-request timeouts
+ * via {@link TritonClientConfig}</li>
+ * <li><strong>Error Handling:</strong> Graceful handling of gRPC errors with
+ * optional verbose logging</li>
  * </ul>
  *
  * <h2>Usage Example:</h2>
@@ -81,12 +90,15 @@ import io.grpc.stub.StreamObserver;
  * }</pre>
  *
  * <h2>Thread Safety:</h2>
- * <p>This client is thread-safe and can be shared across multiple threads. The underlying gRPC channel
- * handles concurrent requests efficiently.
+ * <p>
+ * This client is thread-safe and can be shared across multiple threads. The
+ * underlying gRPC channel handles concurrent requests efficiently.
  *
  * <h2>Resource Management:</h2>
- * <p>Always call {@link #close()} to properly release the underlying gRPC channel and cleanup resources.
- * Consider using try-with-resources or try-finally blocks to ensure cleanup.
+ * <p>
+ * Always call {@link #close()} to properly release the underlying gRPC channel
+ * and cleanup resources. Consider using try-with-resources or try-finally
+ * blocks to ensure cleanup.
  *
  * @author sachachoumiloff
  * @since 1.0.0
@@ -104,11 +116,14 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Creates a new TritonGrpcClient with the given configuration.
      *
-     * <p>Initializes a connection to the Triton server specified in the configuration.
-     * The underlying gRPC channel is created with plaintext (non-TLS) communication.
-     * TLS support can be added in future versions if needed.
+     * <p>
+     * Initializes a connection to the Triton server specified in the
+     * configuration. The underlying gRPC channel is created with plaintext
+     * (non-TLS) communication. TLS support can be added in future versions if
+     * needed.
      *
-     * @param config the client configuration specifying server URL, timeout, and other options
+     * @param config the client configuration specifying server URL, timeout,
+     * and other options
      * @throws io.grpc.StatusRuntimeException if the connection fails
      */
     public TritonGrpcClient(TritonClientConfig config) {
@@ -123,8 +138,9 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Creates a TritonGrpcClient with provided channel and stubs.
      *
-     * <p>This constructor is intended for testing purposes and allows injection of mock
-     * or custom gRPC stubs.
+     * <p>
+     * This constructor is intended for testing purposes and allows injection of
+     * mock or custom gRPC stubs.
      *
      * @param config the client configuration
      * @param channel the gRPC managed channel
@@ -143,7 +159,9 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Returns the blocking stub with the configured timeout deadline.
      *
-     * <p>Each call to this method creates a new stub instance with the deadline applied.
+     * <p>
+     * Each call to this method creates a new stub instance with the deadline
+     * applied.
      *
      * @return the blocking stub with timeout deadline
      */
@@ -154,8 +172,9 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Executes a gRPC call with automatic timeout and error handling.
      *
-     * <p>Wraps gRPC calls to provide consistent error handling and logging. If verbose mode
-     * is enabled, errors are logged before being re-thrown.
+     * <p>
+     * Wraps gRPC calls to provide consistent error handling and logging. If
+     * verbose mode is enabled, errors are logged before being re-thrown.
      *
      * @param <T> the return type of the gRPC call
      * @param operationName the name of the operation (for logging)
@@ -178,8 +197,9 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Checks if the Triton server is alive.
      *
-     * <p>This is a lightweight health check that verifies the server process is running.
-     * A server can be live but not ready if it's still initializing.
+     * <p>
+     * This is a lightweight health check that verifies the server process is
+     * running. A server can be live but not ready if it's still initializing.
      *
      * @return true if the server is alive, false otherwise
      * @throws StatusRuntimeException if the gRPC call fails
@@ -195,8 +215,10 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Checks if the Triton server is ready to accept requests.
      *
-     * <p>A ready server has completed initialization and is prepared to handle inference requests.
-     * This should be checked before attempting to perform inference.
+     * <p>
+     * A ready server has completed initialization and is prepared to handle
+     * inference requests. This should be checked before attempting to perform
+     * inference.
      *
      * @return true if the server is ready, false otherwise
      * @throws StatusRuntimeException if the gRPC call fails
@@ -213,7 +235,8 @@ public class TritonGrpcClient implements TritonClient {
      * Checks if a specific model is ready to accept inference requests.
      *
      * @param modelId the name of the model to check
-     * @param modelVersion the version of the model (can be null for latest version)
+     * @param modelVersion the version of the model (can be null for latest
+     * version)
      * @return true if the model is ready, false otherwise
      * @throws StatusRuntimeException if the gRPC call fails
      */
@@ -243,7 +266,9 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Retrieves comprehensive metadata about the Triton server.
      *
-     * <p>Returns information including server name, version, and supported extensions.
+     * <p>
+     * Returns information including server name, version, and supported
+     * extensions.
      *
      * @return the server metadata
      * @throws StatusRuntimeException if the gRPC call fails
@@ -260,11 +285,14 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Retrieves metadata about a specific model's inputs and outputs.
      *
-     * <p>The metadata includes tensor names, data types, and shapes for the model's
-     * inputs and outputs, which is essential for correctly formatting inference requests.
+     * <p>
+     * The metadata includes tensor names, data types, and shapes for the
+     * model's inputs and outputs, which is essential for correctly formatting
+     * inference requests.
      *
      * @param modelId the name of the model
-     * @param modelVersion the version of the model (can be null for latest version)
+     * @param modelVersion the version of the model (can be null for latest
+     * version)
      * @return the model metadata including inputs and outputs schema
      * @throws StatusRuntimeException if the gRPC call fails or model not found
      * @see TritonModelMetadata
@@ -283,11 +311,13 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Retrieves runtime configuration information for a specific model.
      *
-     * <p>The configuration includes platform type, backend, runtime environment, batching
-     * capabilities, and model file mappings.
+     * <p>
+     * The configuration includes platform type, backend, runtime environment,
+     * batching capabilities, and model file mappings.
      *
      * @param modelId the name of the model
-     * @param modelVersion the version of the model (can be null for latest version)
+     * @param modelVersion the version of the model (can be null for latest
+     * version)
      * @return the model runtime configuration
      * @throws StatusRuntimeException if the gRPC call fails or model not found
      * @see TritonModelConfig
@@ -305,7 +335,8 @@ public class TritonGrpcClient implements TritonClient {
     }
 
     /**
-     * Retrieves runtime configuration information for a specific model (latest version).
+     * Retrieves runtime configuration information for a specific model (latest
+     * version).
      *
      * @param modelId the name of the model
      * @return the model runtime configuration
@@ -318,10 +349,13 @@ public class TritonGrpcClient implements TritonClient {
     }
 
     /**
-     * Retrieves the repository index containing all available models and their status.
+     * Retrieves the repository index containing all available models and their
+     * status.
      *
-     * <p>Returns a listing of all models in the repository, including their names, versions,
-     * availability status, and reasons for unavailability if applicable.
+     * <p>
+     * Returns a listing of all models in the repository, including their names,
+     * versions, availability status, and reasons for unavailability if
+     * applicable.
      *
      * @return the repository index with all models information
      * @throws StatusRuntimeException if the gRPC call fails
@@ -338,8 +372,10 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Requests the server to load a model.
      *
-     * <p>Asynchronously loads the specified model into memory. The model will become available
-     * for inference once loading completes. Check model readiness after calling this method.
+     * <p>
+     * Asynchronously loads the specified model into memory. The model will
+     * become available for inference once loading completes. Check model
+     * readiness after calling this method.
      *
      * @param modelId the name of the model to load
      * @throws StatusRuntimeException if the gRPC call fails
@@ -355,8 +391,10 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Requests the server to unload a model.
      *
-     * <p>Unloads the specified model from memory, freeing associated resources. The model will
-     * no longer be available for inference after this call completes.
+     * <p>
+     * Unloads the specified model from memory, freeing associated resources.
+     * The model will no longer be available for inference after this call
+     * completes.
      *
      * @param modelId the name of the model to unload
      * @throws StatusRuntimeException if the gRPC call fails
@@ -372,11 +410,15 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Retrieves comprehensive inference statistics for a model.
      *
-     * <p>Returns performance metrics including inference counts, timing statistics (queue time,
-     * compute time, etc.), memory usage, and response statistics. Can query all versions or a specific version.
+     * <p>
+     * Returns performance metrics including inference counts, timing statistics
+     * (queue time, compute time, etc.), memory usage, and response statistics.
+     * Can query all versions or a specific version.
      *
-     * @param modelId the name of the model (can be null to get statistics for all models)
-     * @param modelVersion the version of the model (can be null for all versions)
+     * @param modelId the name of the model (can be null to get statistics for
+     * all models)
+     * @param modelVersion the version of the model (can be null for all
+     * versions)
      * @return a list of model statistics objects
      * @throws StatusRuntimeException if the gRPC call fails
      * @see TritonModelStatistics
@@ -400,20 +442,28 @@ public class TritonGrpcClient implements TritonClient {
     }
 
     /**
-     * Performs a synchronous (blocking) inference request with custom parameters.
+     * Performs a synchronous (blocking) inference request with custom
+     * parameters.
      *
-     * <p>This method blocks until the inference result is returned from the server or a timeout occurs.
-     * Timeout is controlled via {@link TritonClientConfig#getDefaultTimeoutMs()}.
+     * <p>
+     * This method blocks until the inference result is returned from the server
+     * or a timeout occurs. Timeout is controlled via
+     * {@link TritonClientConfig#getDefaultTimeoutMs()}.
      *
      * <h2>Input Validation:</h2>
-     * <p>All inputs must have raw content available. Inputs are validated to match the model's
-     * expected schema (names, data types, shapes) on the server side.
+     * <p>
+     * All inputs must have raw content available. Inputs are validated to match
+     * the model's expected schema (names, data types, shapes) on the server
+     * side.
      *
      * @param modelId the name of the model to run inference on
-     * @param modelVersion the version of the model (can be null for latest version)
+     * @param modelVersion the version of the model (can be null for latest
+     * version)
      * @param inputs list of input tensors with data prepared for the model
-     * @param customParameters optional map of custom parameters to control inference behavior
-     * @return the inference result containing output tensors and response metadata
+     * @param customParameters optional map of custom parameters to control
+     * inference behavior
+     * @return the inference result containing output tensors and response
+     * metadata
      * @throws StatusRuntimeException if the gRPC call fails or times out
      * @throws TritonDataNotFoundException if an input lacks raw content
      * @see InferInput
@@ -449,12 +499,15 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Performs a synchronous (blocking) inference request.
      *
-     * <p>This method blocks until the inference result is returned from the server or a timeout occurs.
-     * Inference is performed on the latest version of the model.
+     * <p>
+     * This method blocks until the inference result is returned from the server
+     * or a timeout occurs. Inference is performed on the latest version of the
+     * model.
      *
      * @param modelId the name of the model to run inference on
      * @param inputs list of input tensors with data prepared for the model
-     * @return the inference result containing output tensors and response metadata
+     * @return the inference result containing output tensors and response
+     * metadata
      * @throws StatusRuntimeException if the gRPC call fails or times out
      * @throws TritonDataNotFoundException if an input lacks raw content
      * @see InferResult
@@ -465,15 +518,20 @@ public class TritonGrpcClient implements TritonClient {
     }
 
     /**
-     * Performs an asynchronous (non-blocking) inference request with custom parameters.
+     * Performs an asynchronous (non-blocking) inference request with custom
+     * parameters.
      *
-     * <p>This method returns immediately with a CompletableFuture that will be completed when the
-     * inference result is received from the server. The request is executed concurrently in the
-     * background. Use the returned future to handle the result or errors.
+     * <p>
+     * This method returns immediately with a CompletableFuture that will be
+     * completed when the inference result is received from the server. The
+     * request is executed concurrently in the background. Use the returned
+     * future to handle the result or errors.
      *
      * <h2>Error Handling:</h2>
-     * <p>Errors can occur during request construction (synchronously) or during server processing
-     * (asynchronously). The returned future will be completed exceptionally in case of errors.
+     * <p>
+     * Errors can occur during request construction (synchronously) or during
+     * server processing (asynchronously). The returned future will be completed
+     * exceptionally in case of errors.
      *
      * <h2>Example:</h2>
      * <pre>{@code
@@ -488,10 +546,13 @@ public class TritonGrpcClient implements TritonClient {
      * }</pre>
      *
      * @param modelId the name of the model to run inference on
-     * @param modelVersion the version of the model (can be null for latest version)
+     * @param modelVersion the version of the model (can be null for latest
+     * version)
      * @param inputs list of input tensors with data prepared for the model
-     * @param customParameters optional map of custom parameters to control inference behavior
-     * @return a CompletableFuture that will be completed with the inference result
+     * @param customParameters optional map of custom parameters to control
+     * inference behavior
+     * @return a CompletableFuture that will be completed with the inference
+     * result
      * @see InferResult
      */
     @Override
@@ -537,8 +598,9 @@ public class TritonGrpcClient implements TritonClient {
 
             @Override
             public void onCompleted() {
-                // lorsqu'on fera des streams (bidirectionnel alors il faudra implémenter cette partie)
-                throw new UnsupportedOperationException("Unimplemented method 'onCompleted'");
+                // No-op for unary calls.
+                // The result is already processed in onNext().
+                // To be implemented for bidirectional streaming.
             }
         });
         return future;
@@ -547,12 +609,15 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Performs an asynchronous (non-blocking) inference request.
      *
-     * <p>This method returns immediately with a CompletableFuture that will be completed when the
-     * inference result is received from the server. Inference is performed on the latest version of the model.
+     * <p>
+     * This method returns immediately with a CompletableFuture that will be
+     * completed when the inference result is received from the server.
+     * Inference is performed on the latest version of the model.
      *
      * @param modelId the name of the model to run inference on
      * @param inputs list of input tensors with data prepared for the model
-     * @return a CompletableFuture that will be completed with the inference result
+     * @return a CompletableFuture that will be completed with the inference
+     * result
      */
     @Override
     public CompletableFuture<InferResult> inferAsync(String modelId, List<InferInput> inputs) {
@@ -562,11 +627,15 @@ public class TritonGrpcClient implements TritonClient {
     /**
      * Closes the client and releases the underlying gRPC channel.
      *
-     * <p>This method should be called when the client is no longer needed to free system resources.
-     * After calling close(), the client cannot be used for further requests.
+     * <p>
+     * This method should be called when the client is no longer needed to free
+     * system resources. After calling close(), the client cannot be used for
+     * further requests.
      *
-     * <p>Attempts to gracefully shutdown the channel with a 5-second timeout. If shutdown doesn't
-     * complete within 5 seconds, the channel will be forcefully terminated.
+     * <p>
+     * Attempts to gracefully shutdown the channel with a 5-second timeout. If
+     * shutdown doesn't complete within 5 seconds, the channel will be
+     * forcefully terminated.
      *
      * @throws Exception if an error occurs during shutdown
      */
