@@ -130,6 +130,7 @@ public class TritonGrpcClient implements TritonClient {
         this.config = config;
         this.channel = ManagedChannelBuilder.forTarget(config.getUrl())
                 .usePlaintext()
+                .maxInboundMessageSize(config.getMaxInboundMessageSize())
                 .build();
         this.blockingStub = GRPCInferenceServiceGrpc.newBlockingStub(channel);
         this.asyncStub = GRPCInferenceServiceGrpc.newStub(channel);

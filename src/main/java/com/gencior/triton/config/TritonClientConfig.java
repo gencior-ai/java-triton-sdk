@@ -29,6 +29,7 @@ public class TritonClientConfig {
     private final String url;
     private final boolean verbose;
     private final long defaultTimeoutMs;
+    private final int maxInboundMessageSize;
 
     /**
      * Private constructor used by the Builder to create TritonClientConfig instances.
@@ -39,6 +40,7 @@ public class TritonClientConfig {
         this.url = builder.url;
         this.verbose = builder.verbose;
         this.defaultTimeoutMs = builder.defaultTimeoutMs;
+        this.maxInboundMessageSize = builder.maxInboundMessageSize;
     }
 
     /**
@@ -68,6 +70,16 @@ public class TritonClientConfig {
     public long getDefaultTimeoutMs() { return defaultTimeoutMs; }
 
     /**
+     * Returns the maximum inbound gRPC message size in bytes.
+     *
+     * <p>This controls the maximum size of responses the client can receive from the server.
+     * Defaults to {@link Integer#MAX_VALUE} to allow large batch inference responses.
+     *
+     * @return the maximum inbound message size in bytes
+     */
+    public int getMaxInboundMessageSize() { return maxInboundMessageSize; }
+
+    /**
      * Builder class for constructing {@code TritonClientConfig} instances.
      *
      * <p>This builder follows the fluent builder pattern, allowing method chaining to construct
@@ -87,6 +99,7 @@ public class TritonClientConfig {
         private String url;
         private boolean verbose = false;
         private long defaultTimeoutMs = 60000;
+        private int maxInboundMessageSize = Integer.MAX_VALUE;
 
         /**
          * Creates a new builder for TritonClientConfig.
@@ -119,6 +132,20 @@ public class TritonClientConfig {
          */
         public Builder timeout(long timeoutMs) {
             this.defaultTimeoutMs = timeoutMs;
+            return this;
+        }
+
+        /**
+         * Sets the maximum inbound gRPC message size in bytes.
+         *
+         * <p>Defaults to {@link Integer#MAX_VALUE}. Reduce this value if you want to
+         * limit the size of responses accepted from the server.
+         *
+         * @param maxInboundMessageSize the maximum inbound message size in bytes
+         * @return this builder instance for method chaining
+         */
+        public Builder maxInboundMessageSize(int maxInboundMessageSize) {
+            this.maxInboundMessageSize = maxInboundMessageSize;
             return this;
         }
 
