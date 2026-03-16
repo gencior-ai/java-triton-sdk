@@ -1,19 +1,17 @@
 package com.gencior.triton.http;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import com.gencior.triton.TritonClient;
 import com.gencior.triton.core.InferInput;
+import com.gencior.triton.core.InferParameters;
 import com.gencior.triton.core.InferResult;
 import com.gencior.triton.core.pojo.TritonModelConfig;
 import com.gencior.triton.core.pojo.TritonModelMetadata;
 import com.gencior.triton.core.pojo.TritonModelStatistics;
 import com.gencior.triton.core.pojo.TritonRepositoryIndex;
 import com.gencior.triton.core.pojo.TritonServerMetadata;
-
-import inference.GrpcService;
 
 /**
  *
@@ -93,7 +91,7 @@ public class TritonHttpClient implements TritonClient {
 
     @Override
     public InferResult infer(String modelId, String modelVersion, List<InferInput> inputs,
-            Map<String, GrpcService.InferParameter> customParameters) {
+            InferParameters customParameters) {
         throw new UnsupportedOperationException("Unimplemented method 'infer'");
     }
 
@@ -104,7 +102,7 @@ public class TritonHttpClient implements TritonClient {
 
     @Override
     public CompletableFuture<InferResult> inferAsync(String modelId, String modelVersion, List<InferInput> inputs,
-            Map<String, GrpcService.InferParameter> customParameters) {
+            InferParameters customParameters) {
         throw new UnsupportedOperationException("Unimplemented method 'inferAsync'");
     }
 

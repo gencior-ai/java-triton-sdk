@@ -1,5 +1,6 @@
 package com.gencior.triton.grpc;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -10,6 +11,7 @@ import java.util.logging.Logger;
 import com.gencior.triton.TritonClient;
 import com.gencior.triton.config.TritonClientConfig;
 import com.gencior.triton.core.InferInput;
+import com.gencior.triton.core.InferParameters;
 import com.gencior.triton.core.InferResult;
 import com.gencior.triton.core.pojo.TritonModelConfig;
 import com.gencior.triton.core.pojo.TritonModelMetadata;
@@ -475,7 +477,7 @@ public class TritonGrpcClient implements TritonClient {
             String modelId,
             String modelVersion,
             List<InferInput> inputs,
-            Map<String, GrpcService.InferParameter> customParameters
+            InferParameters customParameters
     ) {
         return this.executeWithTimeout("infer", () -> {
             var builder = GrpcService.ModelInferRequest.newBuilder()
@@ -491,7 +493,7 @@ public class TritonGrpcClient implements TritonClient {
                 }
             }
             if (customParameters != null) {
-                builder.putAllParameters(customParameters);
+                builder.putAllParameters(toGrpcParameters(customParameters));
             }
             return new InferResult(this.getStub().modelInfer(builder.build()));
         });
@@ -558,7 +560,7 @@ public class TritonGrpcClient implements TritonClient {
      */
     @Override
     public CompletableFuture<InferResult> inferAsync(String modelId, String modelVersion, List<InferInput> inputs,
-            Map<String, GrpcService.InferParameter> customParameters) {
+            InferParameters customParameters) {
         CompletableFuture<InferResult> future = new CompletableFuture<>();
         GrpcService.ModelInferRequest.Builder builder = GrpcService.ModelInferRequest.newBuilder()
                 .setModelName(modelId)
@@ -573,7 +575,7 @@ public class TritonGrpcClient implements TritonClient {
                 }
             }
             if (customParameters != null) {
-                builder.putAllParameters(customParameters);
+                builder.putAllParameters(toGrpcParameters(customParameters));
             }
         } catch (TritonDataNotFoundException e) {
             future.completeExceptionally(e);
@@ -645,6 +647,35 @@ public class TritonGrpcClient implements TritonClient {
         if (channel != null && !channel.isShutdown()) {
             channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
         }
+    }
+
+    /**
+     * Converts protocol-agnostic {@link InferParameters} to gRPC-specific
+     * {@link GrpcService.InferParameter} map.
+     *
+     * @param params the protocol-agnostic parameters
+     * @return a map of gRPC InferParameter values
+     */
+    private Map<String, GrpcService.InferParameter> toGrpcParameters(InferParameters params) {
+        Map<String, GrpcService.InferParameter> grpcParams = new HashMap<>();
+        for (Map.Entry<String, Object> entry : params.asMap().entrySet()) {
+            GrpcService.InferParameter.Builder paramBuilder = GrpcService.InferParameter.newBuilder();
+            Object value = entry.getValue();
+            if (value instanceof String s) {
+                paramBuilder.setStringParam(s);
+            } else if (value instanceof Long l) {
+                paramBuilder.setInt64Param(l);
+            } else if (value instanceof Boolean b) {
+                paramBuilder.setBoolParam(b);
+            } else if (value instanceof Double d) {
+                paramBuilder.setDoubleParam(d);
+            } else {
+                throw new IllegalArgumentException(
+                        "Unsupported parameter type for key '" + entry.getKey() + "': " + value.getClass().getName());
+            }
+            grpcParams.put(entry.getKey(), paramBuilder.build());
+        }
+        return grpcParams;
     }
 
 }
