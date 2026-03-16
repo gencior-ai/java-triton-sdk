@@ -493,7 +493,7 @@ public class TritonGrpcClient implements TritonClient {
             if (customParameters != null) {
                 builder.putAllParameters(customParameters);
             }
-            return new InferResult(this.blockingStub.modelInfer(builder.build()));
+            return new InferResult(this.getStub().modelInfer(builder.build()));
         });
     }
 
