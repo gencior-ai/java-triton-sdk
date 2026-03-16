@@ -1,0 +1,27 @@
+name: "sleeper"
+backend: "python"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "DELAY_MS"
+    data_type: TYPE_INT32
+    dims: [1]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [-1]
+  }
+]
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
