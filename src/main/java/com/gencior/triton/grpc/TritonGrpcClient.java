@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -15,13 +17,17 @@ import com.gencior.triton.TritonClient;
 import com.gencior.triton.config.TritonClientConfig;
 import com.gencior.triton.core.InferInput;
 import com.gencior.triton.core.InferParameters;
+import com.gencior.triton.core.InferRequestedOutput;
 import com.gencior.triton.core.InferResult;
+import com.gencior.triton.core.InferStreamHandle;
+import com.gencior.triton.core.InferStreamListener;
 import com.gencior.triton.core.pojo.TritonModelConfig;
 import com.gencior.triton.core.pojo.TritonModelMetadata;
 import com.gencior.triton.core.pojo.TritonModelStatistics;
 import com.gencior.triton.core.pojo.TritonRepositoryIndex;
 import com.gencior.triton.core.pojo.TritonServerMetadata;
 import com.gencior.triton.exceptions.TritonDataNotFoundException;
+import com.gencior.triton.exceptions.TritonStreamException;
 
 import inference.GRPCInferenceServiceGrpc;
 import inference.GRPCInferenceServiceGrpc.GRPCInferenceServiceBlockingStub;
@@ -38,6 +44,7 @@ import inference.GrpcService.ServerLiveRequest;
 import inference.GrpcService.ServerMetadataRequest;
 import inference.GrpcService.ServerReadyRequest;
 import io.grpc.ChannelCredentials;
+import io.grpc.Context;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -511,7 +518,7 @@ public class TritonGrpcClient implements TritonClient {
     @Override
     public List<TritonModelStatistics> getInferenceStatistics(String modelId, String modelVersion) {
         return this.executeWithTimeout("getInferenceStatistics", () -> {
-            var builder = ModelStatisticsRequest.newBuilder();
+            inference.GrpcService.ModelStatisticsRequest.Builder builder = ModelStatisticsRequest.newBuilder();
             if (modelId != null) {
                 builder.setName(modelId);
             }
@@ -561,9 +568,21 @@ public class TritonGrpcClient implements TritonClient {
             List<InferInput> inputs,
             InferParameters customParameters
     ) {
+        return infer(modelId, modelVersion, inputs, null, customParameters);
+    }
+
+    @Override
+    public InferResult infer(
+            String modelId,
+            String modelVersion,
+            List<InferInput> inputs,
+            List<InferRequestedOutput> outputs,
+            InferParameters customParameters
+    ) {
         Objects.requireNonNull(modelId, "modelId must not be null");
         Objects.requireNonNull(inputs, "inputs must not be null");
-        log.debug("infer model={} version={} inputs={}", modelId, modelVersion, inputs.size());
+        log.debug("infer model={} version={} inputs={} outputs={}", modelId, modelVersion,
+                inputs.size(), outputs != null ? outputs.size() : "all");
         if (log.isTraceEnabled()) {
             for (InferInput input : inputs) {
                 log.trace("  input={} dtype={} shape={} rawBytes={}",
@@ -573,22 +592,8 @@ public class TritonGrpcClient implements TritonClient {
             }
         }
         return this.executeWithTimeout("infer[" + modelId + "]", () -> {
-            var builder = GrpcService.ModelInferRequest.newBuilder()
-                    .setModelName(modelId)
-                    .setModelVersion(modelVersion != null ? modelVersion : "");
-
-            for (InferInput input : inputs) {
-                builder.addInputs(input.getTensor());
-                if (input.hasRawContent()) {
-                    builder.addRawInputContents(com.google.protobuf.UnsafeByteOperations.unsafeWrap(input.getRawContent()));
-                } else {
-                    throw new TritonDataNotFoundException(input.getName());
-                }
-            }
-            if (customParameters != null) {
-                builder.putAllParameters(toGrpcParameters(customParameters));
-            }
-            return new InferResult(this.getStub().modelInfer(builder.build()));
+            GrpcService.ModelInferRequest request = buildInferRequest(modelId, modelVersion, inputs, outputs, customParameters);
+            return new InferResult(this.getStub().modelInfer(request));
         });
     }
 
@@ -654,31 +659,26 @@ public class TritonGrpcClient implements TritonClient {
     @Override
     public CompletableFuture<InferResult> inferAsync(String modelId, String modelVersion, List<InferInput> inputs,
             InferParameters customParameters) {
+        return inferAsync(modelId, modelVersion, inputs, null, customParameters);
+    }
+
+    @Override
+    public CompletableFuture<InferResult> inferAsync(String modelId, String modelVersion, List<InferInput> inputs,
+            List<InferRequestedOutput> outputs, InferParameters customParameters) {
         Objects.requireNonNull(modelId, "modelId must not be null");
         Objects.requireNonNull(inputs, "inputs must not be null");
-        log.debug("inferAsync model={} version={} inputs={}", modelId, modelVersion, inputs.size());
+        log.debug("inferAsync model={} version={} inputs={} outputs={}", modelId, modelVersion,
+                inputs.size(), outputs != null ? outputs.size() : "all");
         final long startTime = System.nanoTime();
         CompletableFuture<InferResult> future = new CompletableFuture<>();
-        GrpcService.ModelInferRequest.Builder builder = GrpcService.ModelInferRequest.newBuilder()
-                .setModelName(modelId)
-                .setModelVersion(modelVersion != null ? modelVersion : "");
+        GrpcService.ModelInferRequest request;
         try {
-            for (InferInput input : inputs) {
-                builder.addInputs(input.getTensor());
-                if (input.hasRawContent()) {
-                    builder.addRawInputContents(com.google.protobuf.UnsafeByteOperations.unsafeWrap(input.getRawContent()));
-                } else {
-                    throw new TritonDataNotFoundException(input.getName());
-                }
-            }
-            if (customParameters != null) {
-                builder.putAllParameters(toGrpcParameters(customParameters));
-            }
+            request = buildInferRequest(modelId, modelVersion, inputs, outputs, customParameters);
         } catch (TritonDataNotFoundException e) {
             future.completeExceptionally(e);
             return future;
         }
-        this.asyncStub.modelInfer(builder.build(), new StreamObserver<GrpcService.ModelInferResponse>() {
+        this.asyncStub.modelInfer(request, new StreamObserver<GrpcService.ModelInferResponse>() {
 
             @Override
             public void onNext(GrpcService.ModelInferResponse response) {
@@ -698,7 +698,6 @@ public class TritonGrpcClient implements TritonClient {
             public void onCompleted() {
                 // No-op for unary calls.
                 // The result is already processed in onNext().
-                // To be implemented for bidirectional streaming.
             }
         });
         return future;
@@ -720,6 +719,235 @@ public class TritonGrpcClient implements TritonClient {
     @Override
     public CompletableFuture<InferResult> inferAsync(String modelId, List<InferInput> inputs) {
         return inferAsync(modelId, null, inputs, null);
+    }
+
+    /**
+     * Performs a streaming inference request with callback-based token delivery.
+     *
+     * <p>
+     * Designed for LLM and decoupled model use cases where the server streams
+     * back multiple responses (tokens) for a single request. The listener
+     * receives each token as it arrives.
+     *
+     * <h2>Example:</h2>
+     * <pre>{@code
+     * InferStreamHandle handle = client.inferStream("vllm_model", List.of(prompt),
+     *     result -> System.out.print(result.asStringArray("text_output")[0]));
+     * handle.await(60, TimeUnit.SECONDS);
+     * }</pre>
+     *
+     * @param modelId the name of the model to run inference on
+     * @param modelVersion the version of the model (can be null for latest version)
+     * @param inputs list of input tensors with data prepared for the model
+     * @param customParameters optional custom parameters
+     * @param listener the callback that receives each streamed token
+     * @return a handle to control the stream lifecycle (cancel, await)
+     * @throws TritonDataNotFoundException if an input lacks raw content
+     */
+    @Override
+    public InferStreamHandle inferStream(String modelId, String modelVersion,
+            List<InferInput> inputs, InferParameters customParameters,
+            InferStreamListener listener) {
+        return inferStream(modelId, modelVersion, inputs, null, customParameters, listener);
+    }
+
+    @Override
+    public InferStreamHandle inferStream(String modelId, String modelVersion,
+            List<InferInput> inputs, List<InferRequestedOutput> outputs,
+            InferParameters customParameters, InferStreamListener listener) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
+        Objects.requireNonNull(inputs, "inputs must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
+        log.debug("inferStream model={} version={} inputs={} outputs={}", modelId, modelVersion,
+                inputs.size(), outputs != null ? outputs.size() : "all");
+
+        GrpcService.ModelInferRequest request = buildInferRequest(modelId, modelVersion, inputs, outputs, customParameters);
+
+        CompletableFuture<Void> completionFuture = new CompletableFuture<>();
+        Context.CancellableContext cancellableContext = Context.current().withCancellation();
+
+        cancellableContext.run(() -> {
+            StreamObserver<GrpcService.ModelInferRequest> requestObserver =
+                    asyncStub.modelStreamInfer(new StreamObserver<GrpcService.ModelStreamInferResponse>() {
+
+                        @Override
+                        public void onNext(GrpcService.ModelStreamInferResponse response) {
+                            if (!response.getErrorMessage().isEmpty()) {
+                                TritonStreamException ex = new TritonStreamException(response.getErrorMessage());
+                                listener.onError(ex);
+                                completionFuture.completeExceptionally(ex);
+                                return;
+                            }
+                            if (response.hasInferResponse()) {
+                                listener.onToken(new InferResult(response.getInferResponse()));
+                            }
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {
+                            log.error("inferStream[{}] error: {}", modelId, t.getMessage());
+                            listener.onError(t);
+                            completionFuture.completeExceptionally(t);
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                            log.debug("inferStream[{}] completed", modelId);
+                            listener.onComplete();
+                            completionFuture.complete(null);
+                        }
+                    });
+
+            requestObserver.onNext(request);
+            requestObserver.onCompleted();
+        });
+
+        return new InferStreamHandle(() -> cancellableContext.cancel(null), completionFuture);
+    }
+
+    @Override
+    public InferStreamHandle inferStream(String modelId, List<InferInput> inputs,
+            InferStreamListener listener) {
+        return inferStream(modelId, null, inputs, null, listener);
+    }
+
+    /**
+     * Performs a streaming inference request returning a reactive
+     * {@link Flow.Publisher}.
+     *
+     * <p>
+     * Each emitted item is an {@link InferResult} representing a streamed token.
+     * The publisher completes when the server finishes streaming. Cancellation
+     * is supported via {@link Flow.Subscription#cancel()}.
+     *
+     * @param modelId the name of the model to run inference on
+     * @param modelVersion the version of the model (can be null for latest version)
+     * @param inputs list of input tensors with data prepared for the model
+     * @param customParameters optional custom parameters
+     * @return a publisher that emits each streamed inference result
+     * @throws TritonDataNotFoundException if an input lacks raw content
+     */
+    @Override
+    public Flow.Publisher<InferResult> inferStreamPublisher(String modelId, String modelVersion,
+            List<InferInput> inputs, InferParameters customParameters) {
+        return inferStreamPublisher(modelId, modelVersion, inputs, null, customParameters);
+    }
+
+    @Override
+    public Flow.Publisher<InferResult> inferStreamPublisher(String modelId, String modelVersion,
+            List<InferInput> inputs, List<InferRequestedOutput> outputs,
+            InferParameters customParameters) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
+        Objects.requireNonNull(inputs, "inputs must not be null");
+
+        GrpcService.ModelInferRequest request = buildInferRequest(modelId, modelVersion, inputs, outputs, customParameters);
+
+        return subscriber -> {
+            Objects.requireNonNull(subscriber, "subscriber must not be null");
+
+            Context.CancellableContext ctx = Context.current().withCancellation();
+            AtomicBoolean cancelled = new AtomicBoolean(false);
+
+            subscriber.onSubscribe(new Flow.Subscription() {
+                @Override
+                public void request(long n) {
+                    if (n <= 0) {
+                        subscriber.onError(new IllegalArgumentException("non-positive subscription request"));
+                    }
+                }
+
+                @Override
+                public void cancel() {
+                    cancelled.set(true);
+                    ctx.cancel(null);
+                }
+            });
+
+            ctx.run(() -> {
+                StreamObserver<GrpcService.ModelInferRequest> reqObserver =
+                        asyncStub.modelStreamInfer(new StreamObserver<GrpcService.ModelStreamInferResponse>() {
+
+                            @Override
+                            public void onNext(GrpcService.ModelStreamInferResponse response) {
+                                if (cancelled.get()) return;
+
+                                if (!response.getErrorMessage().isEmpty()) {
+                                    subscriber.onError(new TritonStreamException(response.getErrorMessage()));
+                                    ctx.cancel(null);
+                                    return;
+                                }
+
+                                if (response.hasInferResponse()) {
+                                    subscriber.onNext(new InferResult(response.getInferResponse()));
+                                }
+                            }
+
+                            @Override
+                            public void onError(Throwable t) {
+                                if (!cancelled.get()) subscriber.onError(t);
+                            }
+
+                            @Override
+                            public void onCompleted() {
+                                if (!cancelled.get()) subscriber.onComplete();
+                            }
+                        });
+
+                reqObserver.onNext(request);
+                reqObserver.onCompleted();
+            });
+        };
+    }
+
+    @Override
+    public Flow.Publisher<InferResult> inferStreamPublisher(String modelId, List<InferInput> inputs) {
+        return inferStreamPublisher(modelId, null, inputs, null);
+    }
+
+    /**
+     * Builds a {@link GrpcService.ModelInferRequest} from the given parameters.
+     *
+     * <p>
+     * Shared by {@link #infer}, {@link #inferAsync}, {@link #inferStream},
+     * and {@link #inferStreamPublisher} to avoid code duplication.
+     *
+     * @param modelId the model name
+     * @param modelVersion the model version (null for latest)
+     * @param inputs the input tensors
+     * @param customParameters optional parameters
+     * @return the built protobuf request
+     * @throws TritonDataNotFoundException if an input lacks raw content
+     */
+    private GrpcService.ModelInferRequest buildInferRequest(
+            String modelId, String modelVersion,
+            List<InferInput> inputs, List<InferRequestedOutput> outputs,
+            InferParameters customParameters) {
+        inference.GrpcService.ModelInferRequest.Builder builder = GrpcService.ModelInferRequest.newBuilder()
+                .setModelName(modelId)
+                .setModelVersion(modelVersion != null ? modelVersion : "");
+        for (InferInput input : inputs) {
+            builder.addInputs(input.getTensor());
+            if (input.hasRawContent()) {
+                builder.addRawInputContents(
+                        com.google.protobuf.UnsafeByteOperations.unsafeWrap(input.getRawContent()));
+            } else {
+                throw new TritonDataNotFoundException(input.getName());
+            }
+        }
+        if (outputs != null) {
+            for (InferRequestedOutput output : outputs) {
+                inference.GrpcService.ModelInferRequest.InferRequestedOutputTensor.Builder outputBuilder = GrpcService.ModelInferRequest.InferRequestedOutputTensor.newBuilder()
+                        .setName(output.getName());
+                if (output.hasParameters()) {
+                    outputBuilder.putAllParameters(toGrpcParameters(output.getParameters()));
+                }
+                builder.addOutputs(outputBuilder.build());
+            }
+        }
+        if (customParameters != null) {
+            builder.putAllParameters(toGrpcParameters(customParameters));
+        }
+        return builder.build();
     }
 
     /**
@@ -756,8 +984,12 @@ public class TritonGrpcClient implements TritonClient {
      * @return a map of gRPC InferParameter values
      */
     private Map<String, GrpcService.InferParameter> toGrpcParameters(InferParameters params) {
+        return toGrpcParameters(params.asMap());
+    }
+
+    private Map<String, GrpcService.InferParameter> toGrpcParameters(Map<String, Object> paramsMap) {
         Map<String, GrpcService.InferParameter> grpcParams = new HashMap<>();
-        for (Map.Entry<String, Object> entry : params.asMap().entrySet()) {
+        for (Map.Entry<String, Object> entry : paramsMap.entrySet()) {
             GrpcService.InferParameter.Builder paramBuilder = GrpcService.InferParameter.newBuilder();
             Object value = entry.getValue();
             if (value instanceof String s) {
