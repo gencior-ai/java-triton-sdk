@@ -37,9 +37,12 @@ import inference.GrpcService.RepositoryModelUnloadRequest;
 import inference.GrpcService.ServerLiveRequest;
 import inference.GrpcService.ServerMetadataRequest;
 import inference.GrpcService.ServerReadyRequest;
+import io.grpc.ChannelCredentials;
+import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
+import io.grpc.TlsChannelCredentials;
 import io.grpc.stub.StreamObserver;
 
 /**
@@ -123,22 +126,88 @@ public class TritonGrpcClient implements TritonClient {
      *
      * <p>
      * Initializes a connection to the Triton server specified in the
-     * configuration. The underlying gRPC channel is created with plaintext
-     * (non-TLS) communication. TLS support can be added in future versions if
-     * needed.
+     * configuration. The connection mode (plaintext or TLS) is determined by
+     * {@link TritonClientConfig#isTlsEnabled()}.
      *
      * @param config the client configuration specifying server URL, timeout,
-     * and other options
+     * TLS settings, and other options
      * @throws io.grpc.StatusRuntimeException if the connection fails
+     * @throws IllegalStateException if TLS channel configuration fails
      */
     public TritonGrpcClient(TritonClientConfig config) {
         this.config = config;
-        this.channel = ManagedChannelBuilder.forTarget(config.getUrl())
-                .usePlaintext()
-                .maxInboundMessageSize(config.getMaxInboundMessageSize())
-                .build();
+        this.channel = buildChannel(config);
         this.blockingStub = GRPCInferenceServiceGrpc.newBlockingStub(channel);
         this.asyncStub = GRPCInferenceServiceGrpc.newStub(channel);
+    }
+
+    /**
+     * Builds the gRPC managed channel based on the TLS configuration.
+     *
+     * <p>When TLS is disabled, creates a plaintext channel. When TLS is enabled,
+     * configures TLS credentials with optional trust certificate and client certificates
+     * for mutual TLS.
+     *
+     * @param config the client configuration
+     * @return the configured ManagedChannel
+     * @throws IllegalStateException if TLS channel configuration fails
+     */
+    private static ManagedChannel buildChannel(TritonClientConfig config) {
+        if (!config.isTlsEnabled()) {
+            return ManagedChannelBuilder.forTarget(config.getUrl())
+                    .usePlaintext()
+                    .maxInboundMessageSize(config.getMaxInboundMessageSize())
+                    .build();
+        }
+
+        try {
+            TlsChannelCredentials.Builder tlsBuilder = TlsChannelCredentials.newBuilder();
+
+            if (config.getTrustCertFile() != null) {
+                tlsBuilder.trustManager(config.getTrustCertFile());
+            }
+
+            if (config.getClientCertFile() != null) {
+                tlsBuilder.keyManager(config.getClientCertFile(), config.getClientKeyFile());
+            }
+
+            ChannelCredentials creds = tlsBuilder.build();
+            return Grpc.newChannelBuilderForAddress(
+                            parseHost(config.getUrl()),
+                            parsePort(config.getUrl()),
+                            creds)
+                    .maxInboundMessageSize(config.getMaxInboundMessageSize())
+                    .build();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to configure TLS channel", e);
+        }
+    }
+
+    /**
+     * Extracts the host from a target URL string.
+     *
+     * @param url the target URL (e.g., "localhost:8001" or "dns:///myserver:8001")
+     * @return the host portion
+     */
+    private static String parseHost(String url) {
+        String target = url.contains("://") ? url.substring(url.lastIndexOf("://") + 3) : url;
+        int colonIdx = target.lastIndexOf(':');
+        return colonIdx > 0 ? target.substring(0, colonIdx) : target;
+    }
+
+    /**
+     * Extracts the port from a target URL string.
+     *
+     * @param url the target URL (e.g., "localhost:8001" or "dns:///myserver:8001")
+     * @return the port number, or 443 as default TLS port
+     */
+    private static int parsePort(String url) {
+        String target = url.contains("://") ? url.substring(url.lastIndexOf("://") + 3) : url;
+        int colonIdx = target.lastIndexOf(':');
+        if (colonIdx > 0) {
+            return Integer.parseInt(target.substring(colonIdx + 1));
+        }
+        return 443;
     }
 
     /**
