@@ -22,6 +22,7 @@ import com.gencior.triton.config.TritonClientConfig;
 import com.gencior.triton.core.InferInput;
 import com.gencior.triton.core.InferResult;
 import com.gencior.triton.core.TritonDataType;
+import com.gencior.triton.core.pojo.TritonServerMetadata;
 import com.gencior.triton.grpc.TritonGrpcClient;
 
 /**
@@ -116,7 +117,7 @@ class TritonTlsIT {
 
     @Test
     void tls_getServerMetadata_shouldWork() {
-        var metadata = tlsClient.getServerMetadata();
+        TritonServerMetadata metadata = tlsClient.getServerMetadata();
         assertNotNull(metadata);
         assertNotNull(metadata.getName());
         assertNotNull(metadata.getVersion());

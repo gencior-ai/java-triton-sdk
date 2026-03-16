@@ -22,6 +22,7 @@ import com.gencior.triton.config.TritonClientConfig;
 import com.gencior.triton.core.InferInput;
 import com.gencior.triton.core.InferResult;
 import com.gencior.triton.core.TritonDataType;
+import com.gencior.triton.core.pojo.TritonServerMetadata;
 import com.gencior.triton.grpc.TritonGrpcClient;
 
 /**
@@ -122,7 +123,7 @@ class TritonMtlsIT {
 
     @Test
     void mtls_getServerMetadata_shouldWork() {
-        var metadata = mtlsClient.getServerMetadata();
+        TritonServerMetadata metadata = mtlsClient.getServerMetadata();
         assertNotNull(metadata);
         assertNotNull(metadata.getName());
     }

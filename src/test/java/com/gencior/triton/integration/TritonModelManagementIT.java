@@ -7,10 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
 
 import com.gencior.triton.core.pojo.TritonModelConfig;
 import com.gencior.triton.core.pojo.TritonModelMetadata;
@@ -128,7 +128,7 @@ class TritonModelManagementIT extends AbstractTritonIntegrationTest {
     @Order(20)
     void getInferenceStatistics_shouldReturnStats() {
         // Trigger at least one inference first
-        var input = new com.gencior.triton.core.InferInput("INPUT0", new long[]{3}, com.gencior.triton.core.TritonDataType.FP32);
+        com.gencior.triton.core.InferInput input = new com.gencior.triton.core.InferInput("INPUT0", new long[]{3}, com.gencior.triton.core.TritonDataType.FP32);
         input.setData(new float[]{1.0f, 2.0f, 3.0f});
         client.infer(MODEL_ID, List.of(input));
 
