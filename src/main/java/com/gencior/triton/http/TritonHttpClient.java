@@ -2,11 +2,16 @@ package com.gencior.triton.http;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Flow;
+import java.util.concurrent.Flow.Publisher;
 
 import com.gencior.triton.TritonClient;
 import com.gencior.triton.core.InferInput;
 import com.gencior.triton.core.InferParameters;
+import com.gencior.triton.core.InferRequestedOutput;
 import com.gencior.triton.core.InferResult;
+import com.gencior.triton.core.InferStreamHandle;
+import com.gencior.triton.core.InferStreamListener;
 import com.gencior.triton.core.pojo.TritonModelConfig;
 import com.gencior.triton.core.pojo.TritonModelMetadata;
 import com.gencior.triton.core.pojo.TritonModelStatistics;
@@ -106,4 +111,49 @@ public class TritonHttpClient implements TritonClient {
         throw new UnsupportedOperationException("Unimplemented method 'inferAsync'");
     }
 
+    @Override
+    public InferStreamHandle inferStream(String modelId, List<InferInput> inputs, InferStreamListener listener) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferStream'");
+    }
+
+    @Override
+    public InferStreamHandle inferStream(String modelId, String modelVersion, List<InferInput> inputs,
+            InferParameters customParameters, InferStreamListener listener) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferStream'");
+    }
+
+    @Override
+    public Flow.Publisher<InferResult> inferStreamPublisher(String modelId, List<InferInput> inputs) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferStreamPublisher'");
+    }
+
+    @Override
+    public Flow.Publisher<InferResult> inferStreamPublisher(String modelId, String modelVersion,
+            List<InferInput> inputs, InferParameters customParameters) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferStreamPublisher'");
+    }
+
+    @Override
+    public InferResult infer(String modelId, String modelVersion, List<InferInput> inputs,
+            List<InferRequestedOutput> outputs, InferParameters customParameters) {
+        throw new UnsupportedOperationException("Unimplemented method 'infer'");
+    }
+
+    @Override
+    public CompletableFuture<InferResult> inferAsync(String modelId, String modelVersion, List<InferInput> inputs,
+            List<InferRequestedOutput> outputs, InferParameters customParameters) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferAsync'");
+    }
+
+    @Override
+    public InferStreamHandle inferStream(String modelId, String modelVersion, List<InferInput> inputs,
+            List<InferRequestedOutput> outputs, InferParameters customParameters, InferStreamListener listener) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferStream'");
+    }
+
+    @Override
+    public Publisher<InferResult> inferStreamPublisher(String modelId, String modelVersion, List<InferInput> inputs,
+            List<InferRequestedOutput> outputs, InferParameters customParameters) {
+        throw new UnsupportedOperationException("Unimplemented method 'inferStreamPublisher'");
+    }
 }
