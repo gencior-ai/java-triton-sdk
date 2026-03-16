@@ -139,9 +139,19 @@ public class InferInput {
     public InferInput setData(int[] data) {
         validateDataSize(data.length);
         validateDatatype(TritonDataType.INT8, TritonDataType.INT16, TritonDataType.INT32);
-        ByteBuffer buffer = ByteBuffer.allocate(data.length * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        TritonDataType dtype = getDatatype();
+        int elementSize = switch (dtype) {
+            case INT8 -> Byte.BYTES;
+            case INT16 -> Short.BYTES;
+            default -> Integer.BYTES;
+        };
+        ByteBuffer buffer = ByteBuffer.allocate(data.length * elementSize).order(ByteOrder.LITTLE_ENDIAN);
         for (int v : data) {
-            buffer.putInt(v);
+            switch (dtype) {
+                case INT8 -> buffer.put((byte) v);
+                case INT16 -> buffer.putShort((short) v);
+                default -> buffer.putInt(v);
+            }
         }
         this.rawContent = buffer.array();
         clearSharedMemoryParams();
