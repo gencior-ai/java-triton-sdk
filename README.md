@@ -31,6 +31,7 @@ Five Python backend models are provided in `dev/models_cpu/` for integration tes
 | `identity_string` | STRING | STRING | Echo identity for string inference |
 | `adder` | 2x INT32 | INT32 | Sum of two inputs (multi-input) |
 | `sleeper` | FP32 + DELAY_MS | FP32 | Configurable delay (async/timing) |
+| `streaming_echo` | STRING | STRING | Decoupled model, streams words as tokens (LLM simulation) |
 
 > **Note:** Integration tests are skipped in CI (`-DskipITs`) because the Triton Docker image is too large for GitHub Actions runners.
 
@@ -55,6 +56,7 @@ Five Python backend models are provided in `dev/models_cpu/` for integration tes
 - [x] **Asynchronous inference** - `inferAsync()` returning `CompletableFuture<InferResult>`
 - [x] **Custom parameters** - `InferParameters` builder with type-safe values
 - [x] **Full data type support** - INT8/16/32/64, UINT8/16/32/64, FP16/32/64, BF16, BOOL, BYTES
+- [x] **Streaming inference** - `inferStream()` with callback listener and `inferStreamPublisher()` with `Flow.Publisher` for LLM token-by-token generation (decoupled models)
 
 #### Logging
 - [x] **Structured logging** - SLF4J with DEBUG/TRACE/ERROR levels and operation timing
@@ -80,9 +82,9 @@ Five Python backend models are provided in `dev/models_cpu/` for integration tes
   - Memory synchronization utilities
 
 #### Advanced Streaming & Communication
-- [ ] **Streaming Inference Input abstraction** - High-level API for streaming input data
-- [ ] **Bidirectional streaming** - Full support for streaming inference requests/responses from client
-- [ ] **Requested Output management** - Control which outputs are returned in inference responses
+- [x] **Streaming Inference** - Callback-based (`InferStreamListener`) and reactive (`Flow.Publisher`) APIs for token-by-token streaming
+- [x] **Bidirectional streaming** - Full support via `ModelStreamInfer` gRPC RPC for decoupled models
+- [x] **Requested Output management** - `InferRequestedOutput` to filter returned outputs, reducing bandwidth and memory
 - [x] **Secure communication (TLS)** - Plaintext, one-way TLS, and mutual TLS (mTLS) support
 
 ---
