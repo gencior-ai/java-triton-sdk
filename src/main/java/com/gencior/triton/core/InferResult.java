@@ -11,6 +11,7 @@ import com.gencior.triton.exceptions.TritonDataTypeException;
 import com.gencior.triton.exceptions.TritonInferException;
 import com.google.protobuf.ByteString;
 
+import inference.GrpcService.InferTensorContents;
 import inference.GrpcService.ModelInferResponse;
 import inference.GrpcService.ModelInferResponse.InferOutputTensor;
 
@@ -276,7 +277,7 @@ public class InferResult {
     }
 
     private Object deserializeContents(InferOutputTensor output, TritonDataType datatype) {
-        var contents = output.getContents();
+        InferTensorContents contents = output.getContents();
 
         return switch (datatype) {
             case BOOL -> {
