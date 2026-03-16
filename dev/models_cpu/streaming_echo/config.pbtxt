@@ -1,0 +1,25 @@
+name: "streaming_echo"
+backend: "python"
+model_transaction_policy {
+  decoupled: true
+}
+input [
+  {
+    name: "TEXT_INPUT"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+output [
+  {
+    name: "TEXT_OUTPUT"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]

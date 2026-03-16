@@ -43,6 +43,7 @@ public abstract class AbstractTritonIntegrationTest {
                         "--load-model=identity_string",
                         "--load-model=adder",
                         "--load-model=sleeper",
+                        "--load-model=streaming_echo",
                         "--log-verbose=1"
                 )
                 .withCreateContainerCmdModifier(cmd ->
