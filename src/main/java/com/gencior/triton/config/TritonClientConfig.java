@@ -53,10 +53,12 @@ public class TritonClientConfig {
     /**
      * Returns whether verbose logging is enabled for this client.
      *
-     * <p>When enabled, the client will produce detailed logging output for debugging purposes.
-     *
      * @return {@code true} if verbose logging is enabled, {@code false} otherwise
+     * @deprecated Logging is now managed via SLF4J. Configure the log level for
+     * {@code com.gencior.triton} in your logging framework instead
+     * (e.g. DEBUG for detailed output, TRACE for tensor shapes and sizes).
      */
+    @Deprecated(since = "1.0.0", forRemoval = true)
     public boolean isVerbose() { return verbose; }
 
     /**
@@ -117,7 +119,10 @@ public class TritonClientConfig {
          *
          * @param verbose {@code true} to enable verbose logging, {@code false} otherwise
          * @return this builder instance for method chaining
+         * @deprecated Logging is now managed via SLF4J. Configure the log level for
+         * {@code com.gencior.triton} in your logging framework instead.
          */
+        @Deprecated(since = "1.0.0", forRemoval = true)
         public Builder verbose(boolean verbose) {
             this.verbose = verbose;
             return this;

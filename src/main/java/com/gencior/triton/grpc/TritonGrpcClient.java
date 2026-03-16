@@ -7,7 +7,9 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.gencior.triton.TritonClient;
 import com.gencior.triton.config.TritonClientConfig;
@@ -114,7 +116,7 @@ public class TritonGrpcClient implements TritonClient {
     private final ManagedChannel channel;
     private final GRPCInferenceServiceBlockingStub blockingStub;
     private final GRPCInferenceServiceStub asyncStub;
-    private static final Logger LOG = Logger.getLogger(TritonGrpcClient.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(TritonGrpcClient.class);
 
     /**
      * Creates a new TritonGrpcClient with the given configuration.
@@ -187,13 +189,18 @@ public class TritonGrpcClient implements TritonClient {
      * @throws StatusRuntimeException if the gRPC call fails
      */
     private <T> T executeWithTimeout(String operationName, Supplier<T> grpcCall) {
+        long startTime = System.nanoTime();
         try {
-            return grpcCall.get();
-        } catch (StatusRuntimeException e) {
-            if (config.isVerbose()) {
-                LOG.warning(String.format("Error during operation [%s] : %s (%s)",
-                        operationName, e.getStatus().getCode(), e.getMessage()));
+            T result = grpcCall.get();
+            if (log.isDebugEnabled()) {
+                long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+                log.debug("gRPC {} completed in {}ms", operationName, durationMs);
             }
+            return result;
+        } catch (StatusRuntimeException e) {
+            long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+            log.error("gRPC {} failed after {}ms: {} ({})",
+                    operationName, durationMs, e.getStatus().getCode(), e.getMessage());
             throw e;
         }
     }
@@ -487,7 +494,16 @@ public class TritonGrpcClient implements TritonClient {
     ) {
         Objects.requireNonNull(modelId, "modelId must not be null");
         Objects.requireNonNull(inputs, "inputs must not be null");
-        return this.executeWithTimeout("infer", () -> {
+        log.debug("infer model={} version={} inputs={}", modelId, modelVersion, inputs.size());
+        if (log.isTraceEnabled()) {
+            for (InferInput input : inputs) {
+                log.trace("  input={} dtype={} shape={} rawBytes={}",
+                        input.getName(), input.getDatatype(),
+                        java.util.Arrays.toString(input.getShape()),
+                        input.hasRawContent() ? input.getRawContent().length : 0);
+            }
+        }
+        return this.executeWithTimeout("infer[" + modelId + "]", () -> {
             var builder = GrpcService.ModelInferRequest.newBuilder()
                     .setModelName(modelId)
                     .setModelVersion(modelVersion != null ? modelVersion : "");
@@ -571,6 +587,8 @@ public class TritonGrpcClient implements TritonClient {
             InferParameters customParameters) {
         Objects.requireNonNull(modelId, "modelId must not be null");
         Objects.requireNonNull(inputs, "inputs must not be null");
+        log.debug("inferAsync model={} version={} inputs={}", modelId, modelVersion, inputs.size());
+        final long startTime = System.nanoTime();
         CompletableFuture<InferResult> future = new CompletableFuture<>();
         GrpcService.ModelInferRequest.Builder builder = GrpcService.ModelInferRequest.newBuilder()
                 .setModelName(modelId)
@@ -595,17 +613,15 @@ public class TritonGrpcClient implements TritonClient {
 
             @Override
             public void onNext(GrpcService.ModelInferResponse response) {
-                if (config.isVerbose()) {
-                    LOG.info("Async inference completed for model: ".concat(modelId));
-                }
+                long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+                log.debug("inferAsync[{}] completed in {}ms", modelId, durationMs);
                 future.complete(new InferResult(response));
             }
 
             @Override
             public void onError(Throwable t) {
-                if (config.isVerbose()) {
-                    LOG.severe("Async inference failed: ".concat(t.getMessage()));
-                }
+                long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+                log.error("inferAsync[{}] failed after {}ms: {}", modelId, durationMs, t.getMessage());
                 future.completeExceptionally(t);
             }
 
@@ -657,6 +673,7 @@ public class TritonGrpcClient implements TritonClient {
         if (channel != null && !channel.isShutdown()) {
             channel.shutdown();
             if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("gRPC channel did not terminate gracefully within 5s, forcing shutdown");
                 channel.shutdownNow();
             }
         }
