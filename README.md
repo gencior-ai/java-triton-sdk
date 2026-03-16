@@ -6,9 +6,62 @@ Java Triton SDK is a high-performance, lightweight library designed to bridge th
 
 While Python has excellent support for Triton, Java enterprise environments often struggle with complex gRPC/Protobuf boilerplate. This SDK simplifies that process, allowing you to focus on your AI logic rather than networking protocols.
 
+## Testing
+
+### Unit Tests
+
+```bash
+mvn test
+```
+
+### Integration Tests
+
+Integration tests use [Testcontainers](https://www.testcontainers.org/) to spin up a real Triton Inference Server with Python backend models. **Docker is required**.
+
+```bash
+mvn verify
+```
+
+Five Python backend models are provided in `dev/models_cpu/` for integration testing:
+
+| Model | Inputs | Output | Purpose |
+|-------|--------|--------|---------|
+| `identity_fp32` | FP32 | FP32 | Echo identity for FP32 inference |
+| `identity_int32` | INT32 | INT32 | Echo identity for INT32 inference |
+| `identity_string` | STRING | STRING | Echo identity for string inference |
+| `adder` | 2x INT32 | INT32 | Sum of two inputs (multi-input) |
+| `sleeper` | FP32 + DELAY_MS | FP32 | Configurable delay (async/timing) |
+
+> **Note:** Integration tests are skipped in CI (`-DskipITs`) because the Triton Docker image is too large for GitHub Actions runners.
+
 ## Roadmap & Planned Features
 
-### Phase 1: Complete gRPC Implementation
+### Phase 1: gRPC Implementation
+
+#### Server Management
+- [x] **Server health checks** - `isServerLive()`, `isServerReady()`
+- [x] **Server metadata** - `getServerMetadata()` (name, version, extensions)
+
+#### Model Management
+- [x] **Model readiness** - `isModelReady()` with optional version
+- [x] **Model metadata** - `getModelMetadata()` (inputs/outputs schema, versions)
+- [x] **Model configuration** - `getModelConfig()` (platform, backend, batch size)
+- [x] **Model repository index** - `getModelRepositoryIndex()` (list all models and states)
+- [x] **Model load/unload** - `loadModel()`, `unLoadModel()`
+- [x] **Inference statistics** - `getInferenceStatistics()` (counts, latency, queue, cache)
+
+#### Core Inference
+- [x] **Synchronous inference** - `infer()` with inputs, version, and custom parameters
+- [x] **Asynchronous inference** - `inferAsync()` returning `CompletableFuture<InferResult>`
+- [x] **Custom parameters** - `InferParameters` builder with type-safe values
+- [x] **Full data type support** - INT8/16/32/64, UINT8/16/32/64, FP16/32/64, BF16, BOOL, BYTES
+
+#### Logging
+- [x] **Structured logging** - SLF4J with DEBUG/TRACE/ERROR levels and operation timing
+
+#### Testing
+- [x] **Unit tests** - Full coverage with Mockito mocks (171 tests)
+- [x] **Integration tests** - Testcontainers with real Triton server and Python backend models
 
 #### Trace & Logging Management
 - [ ] **Update trace settings** - Modify trace settings for a specific model or globally
