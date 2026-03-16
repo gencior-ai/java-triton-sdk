@@ -3,6 +3,7 @@ package com.gencior.triton.grpc;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -245,6 +246,7 @@ public class TritonGrpcClient implements TritonClient {
      */
     @Override
     public boolean isModelReady(String modelId, String modelVersion) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
         return this.executeWithTimeout("isModelReady", () -> {
             GrpcService.ModelReadyRequest.Builder builder = ModelReadyRequest.newBuilder().setName(modelId);
             if (modelVersion != null) {
@@ -302,6 +304,7 @@ public class TritonGrpcClient implements TritonClient {
      */
     @Override
     public TritonModelMetadata getModelMetadata(String modelId, String modelVersion) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
         return this.executeWithTimeout("getModelMetadata", () -> {
             GrpcService.ModelMetadataRequest.Builder builder = ModelMetadataRequest.newBuilder().setName(modelId);
             if (modelVersion != null) {
@@ -327,6 +330,7 @@ public class TritonGrpcClient implements TritonClient {
      */
     @Override
     public TritonModelConfig getModelConfig(String modelId, String modelVersion) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
         return this.executeWithTimeout("getModelConfig", () -> {
             GrpcService.ModelConfigRequest.Builder builder = ModelConfigRequest.newBuilder()
                     .setName(modelId);
@@ -385,6 +389,7 @@ public class TritonGrpcClient implements TritonClient {
      */
     @Override
     public void loadModel(String modelId) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
         this.executeWithTimeout("loadModel", () -> {
             GrpcService.RepositoryModelLoadRequest request = RepositoryModelLoadRequest.newBuilder().setModelName(modelId).build();
             return this.getStub().repositoryModelLoad(request);
@@ -404,6 +409,7 @@ public class TritonGrpcClient implements TritonClient {
      */
     @Override
     public void unLoadModel(String modelId) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
         this.executeWithTimeout("unLoadModel", () -> {
             GrpcService.RepositoryModelUnloadRequest request = RepositoryModelUnloadRequest.newBuilder().setModelName(modelId).build();
             return this.getStub().repositoryModelUnload(request);
@@ -479,6 +485,8 @@ public class TritonGrpcClient implements TritonClient {
             List<InferInput> inputs,
             InferParameters customParameters
     ) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
+        Objects.requireNonNull(inputs, "inputs must not be null");
         return this.executeWithTimeout("infer", () -> {
             var builder = GrpcService.ModelInferRequest.newBuilder()
                     .setModelName(modelId)
@@ -561,6 +569,8 @@ public class TritonGrpcClient implements TritonClient {
     @Override
     public CompletableFuture<InferResult> inferAsync(String modelId, String modelVersion, List<InferInput> inputs,
             InferParameters customParameters) {
+        Objects.requireNonNull(modelId, "modelId must not be null");
+        Objects.requireNonNull(inputs, "inputs must not be null");
         CompletableFuture<InferResult> future = new CompletableFuture<>();
         GrpcService.ModelInferRequest.Builder builder = GrpcService.ModelInferRequest.newBuilder()
                 .setModelName(modelId)
@@ -645,7 +655,10 @@ public class TritonGrpcClient implements TritonClient {
     @Override
     public void close() throws Exception {
         if (channel != null && !channel.isShutdown()) {
-            channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            channel.shutdown();
+            if (!channel.awaitTermination(5, TimeUnit.SECONDS)) {
+                channel.shutdownNow();
+            }
         }
     }
 

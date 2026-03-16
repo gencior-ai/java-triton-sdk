@@ -3,6 +3,7 @@ package com.gencior.triton.core;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.gencior.triton.exceptions.TritonDataNotFoundException;
@@ -37,7 +38,7 @@ public class InferResult {
      * @throws NullPointerException if result is null
      */
     public InferResult(ModelInferResponse result) {
-        this.result = result;
+        this.result = Objects.requireNonNull(result, "result must not be null");
     }
 
     public String getRequestId() {

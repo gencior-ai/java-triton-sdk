@@ -5,6 +5,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 
 import com.gencior.triton.exceptions.TritonDataNotFoundException;
 import com.gencior.triton.exceptions.TritonDataTypeException;
@@ -45,6 +46,9 @@ public class InferInput {
      * @param datatype The {@link TritonDataType} of the associated input.
      */
     public InferInput(String name, long[] shape, TritonDataType datatype) {
+        Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(shape, "shape must not be null");
+        Objects.requireNonNull(datatype, "datatype must not be null");
         this.inputBuilder = GrpcService.ModelInferRequest.InferInputTensor.newBuilder()
                 .setName(name)
                 .setDatatype(datatype.getTritonName());
