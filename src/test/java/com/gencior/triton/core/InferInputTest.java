@@ -11,6 +11,9 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.gencior.triton.exceptions.TritonDataTypeException;
+import com.gencior.triton.exceptions.TritonShapeMismatchException;
+
 public class InferInputTest {
 
     private InferInput inferInput;
@@ -393,6 +396,96 @@ public class InferInputTest {
 
         assertSame("setData should return this", inferInput, result);
         assertTrue("Should have raw content", inferInput.hasRawContent());
+    }
+
+    // ========== UINT SUPPORT TESTS ==========
+
+    @Test
+    public void testSetDataIntUint8Success() {
+        inferInput = new InferInput("image", new long[]{4}, TritonDataType.UINT8);
+        int[] data = {0, 128, 200, 255};
+
+        InferInput result = inferInput.setData(data);
+
+        assertSame("setData should return this", inferInput, result);
+        assertTrue("Should have raw content", inferInput.hasRawContent());
+        assertEquals("UINT8 should serialize to 1 byte per element", 4, inferInput.getRawContent().length);
+    }
+
+    @Test
+    public void testSetDataIntUint16Success() {
+        inferInput = new InferInput("test", new long[]{3}, TritonDataType.UINT16);
+        int[] data = {0, 32768, 65535};
+
+        InferInput result = inferInput.setData(data);
+
+        assertSame("setData should return this", inferInput, result);
+        assertTrue("Should have raw content", inferInput.hasRawContent());
+        assertEquals("UINT16 should serialize to 2 bytes per element", 6, inferInput.getRawContent().length);
+    }
+
+    @Test
+    public void testSetDataIntUint32Success() {
+        inferInput = new InferInput("test", new long[]{2}, TritonDataType.UINT32);
+        int[] data = {0, Integer.MAX_VALUE};
+
+        InferInput result = inferInput.setData(data);
+
+        assertSame("setData should return this", inferInput, result);
+        assertTrue("Should have raw content", inferInput.hasRawContent());
+        assertEquals("UINT32 should serialize to 4 bytes per element", 8, inferInput.getRawContent().length);
+    }
+
+    @Test
+    public void testSetDataLongUint64Success() {
+        inferInput = new InferInput("test", new long[]{2}, TritonDataType.UINT64);
+        long[] data = {0L, Long.MAX_VALUE};
+
+        InferInput result = inferInput.setData(data);
+
+        assertSame("setData should return this", inferInput, result);
+        assertTrue("Should have raw content", inferInput.hasRawContent());
+        assertEquals("UINT64 should serialize to 8 bytes per element", 16, inferInput.getRawContent().length);
+    }
+
+    @Test
+    public void testSetDataShortInt16Success() {
+        inferInput = new InferInput("test", new long[]{3}, TritonDataType.INT16);
+        short[] data = {-100, 0, 32767};
+
+        InferInput result = inferInput.setData(data);
+
+        assertSame("setData should return this", inferInput, result);
+        assertTrue("Should have raw content", inferInput.hasRawContent());
+        assertEquals("INT16 short[] should serialize to 2 bytes per element", 6, inferInput.getRawContent().length);
+    }
+
+    @Test
+    public void testSetDataShortUint16Success() {
+        inferInput = new InferInput("test", new long[]{2}, TritonDataType.UINT16);
+        short[] data = {0, 256};
+
+        InferInput result = inferInput.setData(data);
+
+        assertSame("setData should return this", inferInput, result);
+        assertTrue("Should have raw content", inferInput.hasRawContent());
+        assertEquals("UINT16 short[] should serialize to 2 bytes per element", 4, inferInput.getRawContent().length);
+    }
+
+    @Test(expected = TritonDataTypeException.class)
+    public void testSetDataShortWrongDatatype() {
+        inferInput = new InferInput("test", new long[]{2}, TritonDataType.FP32);
+        short[] data = {1, 2};
+
+        inferInput.setData(data);
+    }
+
+    @Test(expected = TritonShapeMismatchException.class)
+    public void testSetDataShortWrongSize() {
+        inferInput = new InferInput("test", new long[]{3}, TritonDataType.INT16);
+        short[] data = {1, 2};
+
+        inferInput.setData(data);
     }
 
     @Test(expected = Exception.class)
