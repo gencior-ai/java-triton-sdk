@@ -278,24 +278,60 @@ public class InferResult {
         var contents = output.getContents();
 
         return switch (datatype) {
-            case BOOL ->
-                contents.getBoolContentsList().stream().toArray(Boolean[]::new);
-            case INT8, INT16, INT32 ->
+            case BOOL -> {
+                List<Boolean> list = contents.getBoolContentsList();
+                boolean[] arr = new boolean[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = list.get(i);
+                yield arr;
+            }
+            case INT8 -> {
+                List<Integer> list = contents.getIntContentsList();
+                byte[] arr = new byte[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = list.get(i).byteValue();
+                yield arr;
+            }
+            case INT16 -> {
+                List<Integer> list = contents.getIntContentsList();
+                short[] arr = new short[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = list.get(i).shortValue();
+                yield arr;
+            }
+            case INT32 ->
                 contents.getIntContentsList().stream().mapToInt(Integer::intValue).toArray();
             case INT64 ->
                 contents.getInt64ContentsList().stream().mapToLong(Long::longValue).toArray();
-            case UINT8, UINT16, UINT32 ->
-                contents.getUintContentsList().stream().mapToInt(Integer::intValue).toArray();
+            case UINT8 -> {
+                List<Integer> list = contents.getUintContentsList();
+                short[] arr = new short[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = (short) (list.get(i) & 0xFF);
+                yield arr;
+            }
+            case UINT16 ->
+                contents.getUintContentsList().stream().mapToInt(v -> v & 0xFFFF).toArray();
+            case UINT32 -> {
+                List<Integer> list = contents.getUintContentsList();
+                long[] arr = new long[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = list.get(i) & 0xFFFFFFFFL;
+                yield arr;
+            }
             case UINT64 ->
                 contents.getUint64ContentsList().stream().mapToLong(Long::longValue).toArray();
-            case FP32 ->
-                contents.getFp32ContentsList().stream().mapToDouble(Float::doubleValue).toArray();
+            case FP32 -> {
+                List<Float> list = contents.getFp32ContentsList();
+                float[] arr = new float[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = list.get(i);
+                yield arr;
+            }
             case FP64 ->
                 contents.getFp64ContentsList().stream().mapToDouble(Double::doubleValue).toArray();
-            case BYTES ->
-                contents.getBytesContentsList().stream().map(ByteString::toByteArray).toArray(byte[][]::new);
+            case BYTES -> {
+                List<ByteString> list = contents.getBytesContentsList();
+                String[] arr = new String[list.size()];
+                for (int i = 0; i < arr.length; i++) arr[i] = list.get(i).toStringUtf8();
+                yield arr;
+            }
             default ->
-                null;
+                throw new TritonDataTypeException("Unsupported datatype: " + datatype);
         };
     }
 
