@@ -83,7 +83,7 @@ Five Python backend models are provided in `dev/models_cpu/` for integration tes
 - [ ] **Streaming Inference Input abstraction** - High-level API for streaming input data
 - [ ] **Bidirectional streaming** - Full support for streaming inference requests/responses from client
 - [ ] **Requested Output management** - Control which outputs are returned in inference responses
-- [ ] **Secure communication (TLS)** - Support for TLS/SSL encrypted connections (currently not supported)
+- [x] **Secure communication (TLS)** - Plaintext, one-way TLS, and mutual TLS (mTLS) support
 
 ---
 
