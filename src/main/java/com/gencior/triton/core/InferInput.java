@@ -5,6 +5,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 
 import com.gencior.triton.exceptions.TritonDataNotFoundException;
 import com.gencior.triton.exceptions.TritonDataTypeException;
@@ -45,6 +46,9 @@ public class InferInput {
      * @param datatype The {@link TritonDataType} of the associated input.
      */
     public InferInput(String name, long[] shape, TritonDataType datatype) {
+        Objects.requireNonNull(name, "name must not be null");
+        Objects.requireNonNull(shape, "shape must not be null");
+        Objects.requireNonNull(datatype, "datatype must not be null");
         this.inputBuilder = GrpcService.ModelInferRequest.InferInputTensor.newBuilder()
                 .setName(name)
                 .setDatatype(datatype.getTritonName());
@@ -130,18 +134,32 @@ public class InferInput {
     }
 
     /**
-     * Sets the tensor data from an int array. Supports INT32, INT16, or INT8
-     * datatypes.
+     * Sets the tensor data from an int array. Supports INT8, INT16, INT32,
+     * UINT8, UINT16, and UINT32 datatypes. Serialization byte size is
+     * determined by the declared datatype.
      *
-     * * @param data The int array to be used as input.
+     * @param data The int array to be used as input.
      * @return This {@code InferInput} instance for method chaining.
+     * @throws TritonDataTypeException If the tensor datatype is incompatible.
+     * @throws TritonShapeMismatchException If data size does not match the shape.
      */
     public InferInput setData(int[] data) {
         validateDataSize(data.length);
-        validateDatatype(TritonDataType.INT8, TritonDataType.INT16, TritonDataType.INT32);
-        ByteBuffer buffer = ByteBuffer.allocate(data.length * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        validateDatatype(TritonDataType.INT8, TritonDataType.INT16, TritonDataType.INT32,
+                TritonDataType.UINT8, TritonDataType.UINT16, TritonDataType.UINT32);
+        TritonDataType dtype = getDatatype();
+        int elementSize = switch (dtype) {
+            case INT8, UINT8 -> Byte.BYTES;
+            case INT16, UINT16 -> Short.BYTES;
+            default -> Integer.BYTES;
+        };
+        ByteBuffer buffer = ByteBuffer.allocate(data.length * elementSize).order(ByteOrder.LITTLE_ENDIAN);
         for (int v : data) {
-            buffer.putInt(v);
+            switch (dtype) {
+                case INT8, UINT8 -> buffer.put((byte) v);
+                case INT16, UINT16 -> buffer.putShort((short) v);
+                default -> buffer.putInt(v);
+            }
         }
         this.rawContent = buffer.array();
         clearSharedMemoryParams();
@@ -149,14 +167,38 @@ public class InferInput {
     }
 
     /**
-     * Sets the tensor data from a long array (INT64).
+     * Sets the tensor data from a short array. Supports INT16, UINT16
+     * datatypes.
      *
-     * * @param data The long array to be used as input.
+     * @param data The short array to be used as input.
      * @return This {@code InferInput} instance for method chaining.
+     * @throws TritonDataTypeException If the tensor datatype is incompatible.
+     * @throws TritonShapeMismatchException If data size does not match the shape.
+     */
+    public InferInput setData(short[] data) {
+        validateDataSize(data.length);
+        validateDatatype(TritonDataType.INT16, TritonDataType.UINT16);
+        ByteBuffer buffer = ByteBuffer.allocate(data.length * Short.BYTES).order(ByteOrder.LITTLE_ENDIAN);
+        for (short v : data) {
+            buffer.putShort(v);
+        }
+        this.rawContent = buffer.array();
+        clearSharedMemoryParams();
+        return this;
+    }
+
+    /**
+     * Sets the tensor data from a long array. Supports INT64 and UINT64
+     * datatypes.
+     *
+     * @param data The long array to be used as input.
+     * @return This {@code InferInput} instance for method chaining.
+     * @throws TritonDataTypeException If the tensor datatype is incompatible.
+     * @throws TritonShapeMismatchException If data size does not match the shape.
      */
     public InferInput setData(long[] data) {
         validateDataSize(data.length);
-        validateDatatype(TritonDataType.INT64);
+        validateDatatype(TritonDataType.INT64, TritonDataType.UINT64);
         ByteBuffer buffer = ByteBuffer.allocate(data.length * Long.BYTES).order(ByteOrder.LITTLE_ENDIAN);
         for (long v : data) {
             buffer.putLong(v);

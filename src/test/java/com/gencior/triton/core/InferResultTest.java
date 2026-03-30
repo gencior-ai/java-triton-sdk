@@ -15,6 +15,7 @@ import com.gencior.triton.exceptions.TritonDataTypeException;
 import com.gencior.triton.exceptions.TritonInferException;
 import com.google.protobuf.ByteString;
 
+import inference.GrpcService.InferTensorContents;
 import inference.GrpcService.ModelInferResponse;
 import inference.GrpcService.ModelInferResponse.InferOutputTensor;
 
@@ -473,6 +474,211 @@ public class InferResultTest {
         assertEquals("Model name should match", "test_model", retrievedResponse.getModelName());
     }
 
+    // ========== TESTS FOR deserializeContents() PATH ==========
+
+    @Test
+    public void testBoolFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "BOOL",
+                InferTensorContents.newBuilder().addBoolContents(true).addBoolContents(false).addBoolContents(true).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be boolean[]", result instanceof boolean[]);
+        boolean[] arr = (boolean[]) result;
+        assertEquals(true, arr[0]);
+        assertEquals(false, arr[1]);
+        assertEquals(true, arr[2]);
+    }
+
+    @Test
+    public void testInt8FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "INT8",
+                InferTensorContents.newBuilder().addIntContents(1).addIntContents(127).addIntContents(-128).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be byte[]", result instanceof byte[]);
+        byte[] arr = (byte[]) result;
+        assertEquals((byte) 1, arr[0]);
+        assertEquals((byte) 127, arr[1]);
+        assertEquals((byte) -128, arr[2]);
+    }
+
+    @Test
+    public void testInt16FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "INT16",
+                InferTensorContents.newBuilder().addIntContents(100).addIntContents(32767).addIntContents(-32768).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be short[]", result instanceof short[]);
+        short[] arr = (short[]) result;
+        assertEquals((short) 100, arr[0]);
+        assertEquals((short) 32767, arr[1]);
+        assertEquals((short) -32768, arr[2]);
+    }
+
+    @Test
+    public void testInt32FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "INT32",
+                InferTensorContents.newBuilder().addIntContents(42).addIntContents(-1).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be int[]", result instanceof int[]);
+        assertArrayEquals(new int[]{42, -1}, (int[]) result);
+    }
+
+    @Test
+    public void testInt64FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "INT64",
+                InferTensorContents.newBuilder().addInt64Contents(1000000L).addInt64Contents(-1L).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be long[]", result instanceof long[]);
+        assertArrayEquals(new long[]{1000000L, -1L}, (long[]) result);
+    }
+
+    @Test
+    public void testUint8FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "UINT8",
+                InferTensorContents.newBuilder().addUintContents(0).addUintContents(128).addUintContents(255).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be short[]", result instanceof short[]);
+        short[] arr = (short[]) result;
+        assertEquals((short) 0, arr[0]);
+        assertEquals((short) 128, arr[1]);
+        assertEquals((short) 255, arr[2]);
+    }
+
+    @Test
+    public void testUint16FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "UINT16",
+                InferTensorContents.newBuilder().addUintContents(0).addUintContents(65535).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be int[]", result instanceof int[]);
+        assertArrayEquals(new int[]{0, 65535}, (int[]) result);
+    }
+
+    @Test
+    public void testUint32FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "UINT32",
+                InferTensorContents.newBuilder().addUintContents(0).addUintContents((int) 0xFFFFFFFFL).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be long[]", result instanceof long[]);
+        long[] arr = (long[]) result;
+        assertEquals(0L, arr[0]);
+        assertEquals(4294967295L, arr[1]);
+    }
+
+    @Test
+    public void testUint64FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "UINT64",
+                InferTensorContents.newBuilder().addUint64Contents(0L).addUint64Contents(Long.MAX_VALUE).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be long[]", result instanceof long[]);
+        assertArrayEquals(new long[]{0L, Long.MAX_VALUE}, (long[]) result);
+    }
+
+    @Test
+    public void testFp32FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "FP32",
+                InferTensorContents.newBuilder().addFp32Contents(1.5f).addFp32Contents(2.5f).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be float[]", result instanceof float[]);
+        assertArrayEquals(new float[]{1.5f, 2.5f}, (float[]) result, 0.001f);
+    }
+
+    @Test
+    public void testFp64FromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "FP64",
+                InferTensorContents.newBuilder().addFp64Contents(1.123).addFp64Contents(2.456).build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be double[]", result instanceof double[]);
+        assertArrayEquals(new double[]{1.123, 2.456}, (double[]) result, 0.000001);
+    }
+
+    @Test
+    public void testBytesFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "BYTES",
+                InferTensorContents.newBuilder()
+                        .addBytesContents(ByteString.copyFromUtf8("hello"))
+                        .addBytesContents(ByteString.copyFromUtf8("world"))
+                        .build());
+        inferResult = new InferResult(response);
+
+        Object result = inferResult.getOutputAsArray("output");
+        assertTrue("Result should be String[]", result instanceof String[]);
+        assertArrayEquals(new String[]{"hello", "world"}, (String[]) result);
+    }
+
+    // ========== TESTS FOR TYPED ACCESSORS WITH CONTENTS PATH ==========
+
+    @Test
+    public void testAsFloatArrayFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "FP32",
+                InferTensorContents.newBuilder().addFp32Contents(3.14f).build());
+        inferResult = new InferResult(response);
+
+        float[] result = inferResult.asFloatArray("output");
+        assertArrayEquals(new float[]{3.14f}, result, 0.001f);
+    }
+
+    @Test
+    public void testAsIntArrayFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "INT32",
+                InferTensorContents.newBuilder().addIntContents(42).build());
+        inferResult = new InferResult(response);
+
+        int[] result = inferResult.asIntArray("output");
+        assertArrayEquals(new int[]{42}, result);
+    }
+
+    @Test
+    public void testAsLongArrayFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "INT64",
+                InferTensorContents.newBuilder().addInt64Contents(123456789L).build());
+        inferResult = new InferResult(response);
+
+        long[] result = inferResult.asLongArray("output");
+        assertArrayEquals(new long[]{123456789L}, result);
+    }
+
+    @Test
+    public void testAsDoubleArrayFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "FP64",
+                InferTensorContents.newBuilder().addFp64Contents(2.718).build());
+        inferResult = new InferResult(response);
+
+        double[] result = inferResult.asDoubleArray("output");
+        assertArrayEquals(new double[]{2.718}, result, 0.001);
+    }
+
+    @Test
+    public void testAsStringArrayFromContents() {
+        ModelInferResponse response = createResponseWithContents("output", "BYTES",
+                InferTensorContents.newBuilder()
+                        .addBytesContents(ByteString.copyFromUtf8("test"))
+                        .build());
+        inferResult = new InferResult(response);
+
+        String[] result = inferResult.asStringArray("output");
+        assertArrayEquals(new String[]{"test"}, result);
+    }
+
     // ========== HELPER METHODS ==========
 
     /**
@@ -485,6 +691,19 @@ public class InferResultTest {
                 .setDatatype(datatype)
                 .build())
             .addRawOutputContents(ByteString.copyFrom(buffer))
+            .build();
+    }
+
+    /**
+     * Helper method to create a ModelInferResponse with structured contents (no raw content)
+     */
+    private ModelInferResponse createResponseWithContents(String outputName, String datatype, InferTensorContents contents) {
+        return ModelInferResponse.newBuilder()
+            .addOutputs(InferOutputTensor.newBuilder()
+                .setName(outputName)
+                .setDatatype(datatype)
+                .setContents(contents)
+                .build())
             .build();
     }
 }

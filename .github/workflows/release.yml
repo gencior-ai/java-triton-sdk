@@ -90,7 +90,7 @@ jobs:
           fi
 
       - name: Build and verify
-        run: mvn clean verify -B
+        run: mvn clean verify -DskipITs -B
 
       - name: Deploy to GitHub Packages
         run: mvn deploy -DskipTests -B

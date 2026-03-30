@@ -1,0 +1,74 @@
+name: Watch Triton Proto Changes
+
+on:
+  schedule:
+    # Check every Monday at 8:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-proto:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout SDK
+        uses: actions/checkout@v4
+
+      - name: Fetch upstream proto
+        run: |
+          curl -sSL -o /tmp/grpc_service_upstream.proto \
+            "https://raw.githubusercontent.com/triton-inference-server/common/main/protobuf/grpc_service.proto"
+
+      - name: Compare with local proto
+        id: diff
+        run: |
+          if diff -q src/main/proto/grpc_service.proto /tmp/grpc_service_upstream.proto > /dev/null 2>&1; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Proto file is up to date."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Proto file has changed upstream!"
+            diff --unified=3 src/main/proto/grpc_service.proto /tmp/grpc_service_upstream.proto | head -100 || true
+          fi
+
+      - name: Create issue if changed
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'proto-update',
+              state: 'open'
+            });
+
+            if (existingIssues.data.length > 0) {
+              console.log('Issue already exists, skipping creation.');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚠️ Triton gRPC proto file has changed upstream',
+              body: [
+                '## Proto file change detected',
+                '',
+                'The `grpc_service.proto` file in [triton-inference-server/common](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto) has been modified.',
+                '',
+                '### Action required',
+                '1. Review the upstream changes',
+                '2. Update `src/main/proto/grpc_service.proto` with the new version',
+                '3. Run `mvn compile` to regenerate Java stubs',
+                '4. Update SDK classes if new RPCs or message fields were added/removed',
+                '5. Update tests accordingly',
+                '',
+                '### Quick diff',
+                '```bash',
+                'curl -sSL https://raw.githubusercontent.com/triton-inference-server/common/main/protobuf/grpc_service.proto | diff src/main/proto/grpc_service.proto -',
+                '```',
+                '',
+                '*This issue was automatically created by the proto-watch workflow.*'
+              ].join('\n'),
+              labels: ['proto-update']
+            });

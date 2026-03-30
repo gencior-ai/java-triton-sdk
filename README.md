@@ -6,9 +6,64 @@ Java Triton SDK is a high-performance, lightweight library designed to bridge th
 
 While Python has excellent support for Triton, Java enterprise environments often struggle with complex gRPC/Protobuf boilerplate. This SDK simplifies that process, allowing you to focus on your AI logic rather than networking protocols.
 
+## Testing
+
+### Unit Tests
+
+```bash
+mvn test
+```
+
+### Integration Tests
+
+Integration tests use [Testcontainers](https://www.testcontainers.org/) to spin up a real Triton Inference Server with Python backend models. **Docker is required**.
+
+```bash
+mvn verify
+```
+
+Five Python backend models are provided in `dev/models_cpu/` for integration testing:
+
+| Model | Inputs | Output | Purpose |
+|-------|--------|--------|---------|
+| `identity_fp32` | FP32 | FP32 | Echo identity for FP32 inference |
+| `identity_int32` | INT32 | INT32 | Echo identity for INT32 inference |
+| `identity_string` | STRING | STRING | Echo identity for string inference |
+| `adder` | 2x INT32 | INT32 | Sum of two inputs (multi-input) |
+| `sleeper` | FP32 + DELAY_MS | FP32 | Configurable delay (async/timing) |
+| `streaming_echo` | STRING | STRING | Decoupled model, streams words as tokens (LLM simulation) |
+
+> **Note:** Integration tests are skipped in CI (`-DskipITs`) because the Triton Docker image is too large for GitHub Actions runners.
+
 ## Roadmap & Planned Features
 
-### Phase 1: Complete gRPC Implementation
+### Phase 1: gRPC Implementation
+
+#### Server Management
+- [x] **Server health checks** - `isServerLive()`, `isServerReady()`
+- [x] **Server metadata** - `getServerMetadata()` (name, version, extensions)
+
+#### Model Management
+- [x] **Model readiness** - `isModelReady()` with optional version
+- [x] **Model metadata** - `getModelMetadata()` (inputs/outputs schema, versions)
+- [x] **Model configuration** - `getModelConfig()` (platform, backend, batch size)
+- [x] **Model repository index** - `getModelRepositoryIndex()` (list all models and states)
+- [x] **Model load/unload** - `loadModel()`, `unLoadModel()`
+- [x] **Inference statistics** - `getInferenceStatistics()` (counts, latency, queue, cache)
+
+#### Core Inference
+- [x] **Synchronous inference** - `infer()` with inputs, version, and custom parameters
+- [x] **Asynchronous inference** - `inferAsync()` returning `CompletableFuture<InferResult>`
+- [x] **Custom parameters** - `InferParameters` builder with type-safe values
+- [x] **Full data type support** - INT8/16/32/64, UINT8/16/32/64, FP16/32/64, BF16, BOOL, BYTES
+- [x] **Streaming inference** - `inferStream()` with callback listener and `inferStreamPublisher()` with `Flow.Publisher` for LLM token-by-token generation (decoupled models)
+
+#### Logging
+- [x] **Structured logging** - SLF4J with DEBUG/TRACE/ERROR levels and operation timing
+
+#### Testing
+- [x] **Unit tests** - Full coverage with Mockito mocks (171 tests)
+- [x] **Integration tests** - Testcontainers with real Triton server and Python backend models
 
 #### Trace & Logging Management
 - [ ] **Update trace settings** - Modify trace settings for a specific model or globally
@@ -27,10 +82,10 @@ While Python has excellent support for Triton, Java enterprise environments ofte
   - Memory synchronization utilities
 
 #### Advanced Streaming & Communication
-- [ ] **Streaming Inference Input abstraction** - High-level API for streaming input data
-- [ ] **Bidirectional streaming** - Full support for streaming inference requests/responses from client
-- [ ] **Requested Output management** - Control which outputs are returned in inference responses
-- [ ] **Secure communication (TLS)** - Support for TLS/SSL encrypted connections (currently not supported)
+- [x] **Streaming Inference** - Callback-based (`InferStreamListener`) and reactive (`Flow.Publisher`) APIs for token-by-token streaming
+- [x] **Bidirectional streaming** - Full support via `ModelStreamInfer` gRPC RPC for decoupled models
+- [x] **Requested Output management** - `InferRequestedOutput` to filter returned outputs, reducing bandwidth and memory
+- [x] **Secure communication (TLS)** - Plaintext, one-way TLS, and mutual TLS (mTLS) support
 
 ---
 

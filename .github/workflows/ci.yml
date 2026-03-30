@@ -48,7 +48,7 @@ jobs:
         run: mvn test
         
       - name: Verify package
-        run: mvn verify
+        run: mvn verify -DskipITs
         
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
