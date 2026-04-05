@@ -6,7 +6,7 @@
 
     <groupId>com.gencior.triton</groupId>
     <artifactId>triton-sdk</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>java-triton-sdk</name>
 
     <properties>
@@ -21,6 +21,7 @@
         <junit-jupiter.version>5.11.4</junit-jupiter.version>
     </properties>
 
+    <packaging>jar</packaging>
     <description>High-performance Java SDK for NVIDIA Triton Inference Server</description>
     <url>https://github.com/gencior-ai/java-triton-sdk</url>
 
@@ -30,6 +31,22 @@
             <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <id>schoumiloff</id>
+            <name>Sacha Choumiloff</name>
+            <email>schoumiloff@icloud.com</email>
+            <organization>Gencior</organization>
+            <organizationUrl>https://github.com/gencior-ai</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git://github.com/gencior-ai/java-triton-sdk.git</connection>
+        <developerConnection>scm:git:ssh://github.com:gencior-ai/java-triton-sdk.git</developerConnection>
+        <url>https://github.com/gencior-ai/java-triton-sdk/tree/main</url>
+    </scm>
 
     <distributionManagement>
         <repository>
@@ -256,4 +273,38 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>central</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
