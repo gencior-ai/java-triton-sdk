@@ -5,6 +5,10 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import com.gencior.triton.exceptions.TritonDataNotFoundException;
@@ -35,7 +39,10 @@ import inference.GrpcService;
  */
 public class InferInput {
 
-    private final GrpcService.ModelInferRequest.InferInputTensor.Builder inputBuilder;
+    private final String name;
+    private final String datatype;
+    private final List<Long> shape;
+    private final Map<String, Object> parameters;
     private byte[] rawContent;
 
     /**
@@ -49,12 +56,13 @@ public class InferInput {
         Objects.requireNonNull(name, "name must not be null");
         Objects.requireNonNull(shape, "shape must not be null");
         Objects.requireNonNull(datatype, "datatype must not be null");
-        this.inputBuilder = GrpcService.ModelInferRequest.InferInputTensor.newBuilder()
-                .setName(name)
-                .setDatatype(datatype.getTritonName());
+        this.name = name;
+        this.datatype = datatype.getTritonName();
+        this.shape = new ArrayList<>();
         for (long dim : shape) {
-            this.inputBuilder.addShape(dim);
+            this.shape.add(dim);
         }
+        this.parameters = new HashMap<>();
         this.rawContent = null;
     }
 
@@ -62,21 +70,28 @@ public class InferInput {
      * @return The name of the input associated with this Input Tensor.
      */
     public String getName() {
-        return inputBuilder.getName();
+        return name;
     }
 
     /**
      * @return The datatype of the input associated with this object.
      */
     public TritonDataType getDatatype() {
-        return TritonDataType.fromString(inputBuilder.getDatatype());
+        return TritonDataType.fromString(datatype);
+    }
+
+    /**
+     * @return The Triton datatype name as a raw string (e.g. "FP32", "INT32").
+     */
+    public String getDatatypeString() {
+        return datatype;
     }
 
     /**
      * @return The current shape of the input as an array of longs.
      */
     public long[] getShape() {
-        return inputBuilder.getShapeList().stream().mapToLong(Long::longValue).toArray();
+        return shape.stream().mapToLong(Long::longValue).toArray();
     }
 
     /**
@@ -87,11 +102,18 @@ public class InferInput {
      * @return This {@code InferInput} instance for method chaining.
      */
     public InferInput setShape(long[] shape) {
-        inputBuilder.clearShape();
+        this.shape.clear();
         for (long dim : shape) {
-            inputBuilder.addShape(dim);
+            this.shape.add(dim);
         }
         return this;
+    }
+
+    /**
+     * @return An unmodifiable copy of the parameters map.
+     */
+    public Map<String, Object> getParameters() {
+        return Collections.unmodifiableMap(parameters);
     }
 
     /**
@@ -257,12 +279,35 @@ public class InferInput {
     }
 
     /**
-     * Returns the underlying Protobuf message builder result.
+     * Returns the underlying Protobuf message built on-the-fly from the
+     * internal fields. Provided for backward compatibility with the gRPC
+     * transport layer.
      *
-     * * @return The {@code InferInputTensor} message.
+     * @return The {@code InferInputTensor} message.
      */
     public GrpcService.ModelInferRequest.InferInputTensor getTensor() {
-        return inputBuilder.build();
+        GrpcService.ModelInferRequest.InferInputTensor.Builder builder =
+                GrpcService.ModelInferRequest.InferInputTensor.newBuilder()
+                        .setName(name)
+                        .setDatatype(datatype);
+        for (long dim : shape) {
+            builder.addShape(dim);
+        }
+        for (Map.Entry<String, Object> entry : parameters.entrySet()) {
+            GrpcService.InferParameter.Builder paramBuilder = GrpcService.InferParameter.newBuilder();
+            Object value = entry.getValue();
+            if (value instanceof String s) {
+                paramBuilder.setStringParam(s);
+            } else if (value instanceof Long l) {
+                paramBuilder.setInt64Param(l);
+            } else if (value instanceof Boolean b) {
+                paramBuilder.setBoolParam(b);
+            } else if (value instanceof Double d) {
+                paramBuilder.setDoubleParam(d);
+            }
+            builder.putParameters(entry.getKey(), paramBuilder.build());
+        }
+        return builder.build();
     }
 
     /**
@@ -293,14 +338,13 @@ public class InferInput {
     }
 
     private void validateDatatype(TritonDataType... expectedTypes) {
-        String actualType = this.inputBuilder.getDatatype();
         boolean match = Arrays.stream(expectedTypes)
-                .anyMatch(type -> type.getTritonName().equals(actualType));
+                .anyMatch(type -> type.getTritonName().equals(this.datatype));
 
         if (!match) {
             throw new TritonDataTypeException(String.format(
                     "Datatype mismatch: expected one of %s but tensor has datatype %s",
-                    Arrays.toString(expectedTypes), actualType));
+                    Arrays.toString(expectedTypes), this.datatype));
         }
     }
 
@@ -317,9 +361,9 @@ public class InferInput {
     }
 
     private void clearSharedMemoryParams() {
-        inputBuilder.removeParameters("shared_memory_region");
-        inputBuilder.removeParameters("shared_memory_byte_size");
-        inputBuilder.removeParameters("shared_memory_offset");
+        parameters.remove("shared_memory_region");
+        parameters.remove("shared_memory_byte_size");
+        parameters.remove("shared_memory_offset");
     }
 
     private byte[] serializeStrings(String[] strings) {
