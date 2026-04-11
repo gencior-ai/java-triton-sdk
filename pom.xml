@@ -19,6 +19,7 @@
         <slf4j.version>2.0.17</slf4j.version>
         <testcontainers.version>1.20.4</testcontainers.version>
         <junit-jupiter.version>5.11.4</junit-jupiter.version>
+        <jackson.version>2.17.0</jackson.version>
     </properties>
 
     <packaging>jar</packaging>
@@ -81,6 +82,11 @@
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java-util</artifactId>
             <version>${protobuf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>javax.annotation</groupId>
