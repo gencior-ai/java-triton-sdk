@@ -1,7 +1,9 @@
 package com.gencior.triton.core;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -23,7 +25,24 @@ import inference.GrpcService.ModelInferResponse.InferOutputTensor;
  */
 public class InferResult {
 
+    /**
+     * Protocol-agnostic descriptor for an output tensor.
+     * Used by the HTTP transport layer to construct InferResult without protobuf dependency.
+     *
+     * @param name the tensor name
+     * @param datatype the Triton datatype string (e.g. "FP32", "INT32", "BYTES")
+     * @param shape the tensor shape
+     * @param rawContent the raw binary content of the tensor
+     */
+    public record OutputTensorDescriptor(String name, String datatype, long[] shape, byte[] rawContent) {}
+
     private final ModelInferResponse result;
+
+    // Protocol-agnostic fields (used when result is null)
+    private final String modelName;
+    private final String modelVersion;
+    private final String requestId;
+    private final List<OutputTensorDescriptor> outputDescriptors;
 
     /**
      * Constructs an InferResult instance that wraps a ModelInferResponse from
@@ -40,40 +59,140 @@ public class InferResult {
      */
     public InferResult(ModelInferResponse result) {
         this.result = Objects.requireNonNull(result, "result must not be null");
+        this.modelName = null;
+        this.modelVersion = null;
+        this.requestId = null;
+        this.outputDescriptors = null;
     }
 
+    /**
+     * Constructs a protocol-agnostic InferResult from raw output tensor descriptors.
+     * <p>
+     * This constructor is used by transport layers (e.g. HTTP) that do not produce
+     * protobuf messages. The deserialization logic for raw content is shared with
+     * the protobuf path.
+     * </p>
+     *
+     * @param modelName the name of the model that produced the result
+     * @param modelVersion the version of the model
+     * @param requestId the request identifier
+     * @param outputs the list of output tensor descriptors, must not be null
+     * @throws NullPointerException if outputs is null
+     */
+    public InferResult(String modelName, String modelVersion, String requestId,
+                       List<OutputTensorDescriptor> outputs) {
+        Objects.requireNonNull(outputs, "outputs must not be null");
+        this.result = null;
+        this.modelName = modelName;
+        this.modelVersion = modelVersion;
+        this.requestId = requestId;
+        this.outputDescriptors = List.copyOf(outputs);
+    }
+
+    /**
+     * Returns the request identifier associated with this inference response.
+     *
+     * @return the request ID, or {@code null} if not set
+     */
     public String getRequestId() {
-        return result.getId();
+        if (result != null) {
+            return result.getId();
+        }
+        return requestId;
     }
 
+    /**
+     * Returns the name of the model that produced this inference result.
+     *
+     * @return the model name
+     */
     public String getModelName() {
-        return result.getModelName();
+        if (result != null) {
+            return result.getModelName();
+        }
+        return modelName;
     }
 
+    /**
+     * Returns the version of the model that produced this inference result.
+     *
+     * @return the model version string
+     */
     public String getModelVersion() {
-        return result.getModelVersion();
+        if (result != null) {
+            return result.getModelVersion();
+        }
+        return modelVersion;
     }
 
+    /**
+     * Returns the names of all output tensors in this response.
+     *
+     * @return a list of output tensor names, in the order they appear in the response
+     */
     public List<String> getOutputNames() {
-        return result.getOutputsList().stream().map(InferOutputTensor::getName).collect(Collectors.toList());
+        if (result != null) {
+            return result.getOutputsList().stream().map(InferOutputTensor::getName).collect(Collectors.toList());
+        }
+        return outputDescriptors.stream().map(OutputTensorDescriptor::name).collect(Collectors.toList());
     }
 
+    /**
+     * Retrieves the output tensor data as a {@code float[]} array.
+     *
+     * @param name the name of the output tensor
+     * @return the deserialized float array
+     * @throws TritonDataNotFoundException if no output with the given name exists
+     * @throws TritonDataTypeException if the tensor datatype is not FP32
+     */
     public float[] asFloatArray(String name) {
         return (float[]) getOutputAsArray(name);
     }
 
+    /**
+     * Retrieves the output tensor data as a {@code double[]} array.
+     *
+     * @param name the name of the output tensor
+     * @return the deserialized double array
+     * @throws TritonDataNotFoundException if no output with the given name exists
+     * @throws TritonDataTypeException if the tensor datatype is not FP64
+     */
     public double[] asDoubleArray(String name) {
         return (double[]) getOutputAsArray(name);
     }
 
+    /**
+     * Retrieves the output tensor data as an {@code int[]} array.
+     *
+     * @param name the name of the output tensor
+     * @return the deserialized int array
+     * @throws TritonDataNotFoundException if no output with the given name exists
+     * @throws TritonDataTypeException if the tensor datatype is not INT32
+     */
     public int[] asIntArray(String name) {
         return (int[]) getOutputAsArray(name);
     }
 
+    /**
+     * Retrieves the output tensor data as a {@code long[]} array.
+     *
+     * @param name the name of the output tensor
+     * @return the deserialized long array
+     * @throws TritonDataNotFoundException if no output with the given name exists
+     * @throws TritonDataTypeException if the tensor datatype is not INT64 or UINT64
+     */
     public long[] asLongArray(String name) {
         return (long[]) getOutputAsArray(name);
     }
 
+    /**
+     * Retrieves the output tensor data as a {@code String[]} array.
+     *
+     * @param name the name of the output tensor
+     * @return the deserialized string array
+     * @throws TritonDataNotFoundException if no output with the given name exists
+     * @throws TritonDataTypeException if the tensor datatype is not BYTES
+     */
     public String[] asStringArray(String name) {
         return (String[]) getOutputAsArray(name);
     }
@@ -116,6 +235,13 @@ public class InferResult {
      * @throws TritonInferException if the tensor is found but contains no data
      */
     public Object getOutputAsArray(String name) {
+        if (result != null) {
+            return getOutputAsArrayFromProto(name);
+        }
+        return getOutputAsArrayFromDescriptors(name);
+    }
+
+    private Object getOutputAsArrayFromProto(String name) {
         int index = 0;
         for (InferOutputTensor output : result.getOutputsList()) {
             if (output.getName().equals(name)) {
@@ -140,27 +266,44 @@ public class InferResult {
         throw new TritonDataNotFoundException("Output tensor '" + name + "' was not found in the ModelInferResponse.");
     }
 
+    private Object getOutputAsArrayFromDescriptors(String name) {
+        for (OutputTensorDescriptor descriptor : outputDescriptors) {
+            if (descriptor.name().equals(name)) {
+                TritonDataType datatype;
+                try {
+                    datatype = TritonDataType.fromString(descriptor.datatype());
+                } catch (Exception e) {
+                    throw new TritonDataTypeException("Unsupported or invalid datatype: " + descriptor.datatype());
+                }
+                if (descriptor.rawContent() == null || descriptor.rawContent().length == 0) {
+                    throw new TritonInferException("Tensor '" + name + "' found but contains no data.");
+                }
+                ByteBuffer buffer = ByteBuffer.wrap(descriptor.rawContent()).order(ByteOrder.LITTLE_ENDIAN);
+                return deserializeRawContentFromBuffer(buffer, datatype);
+            }
+        }
+        throw new TritonDataNotFoundException("Output tensor '" + name + "' was not found in the inference response.");
+    }
+
     /**
-     * Retrieves the InferOutputTensor protobuf message for a specific output by
-     * name.
-     * <p>
-     * This method provides direct access to the raw protobuf message
-     * representing the output tensor. It allows fine-grained control over the
-     * tensor data and metadata, including access to the tensor shape, datatype,
-     * and both raw and structured content representations.
-     * </p>
-     * <p>
-     * For most use cases, {@link #getOutputAsArray(String)} is more convenient
-     * as it automatically deserializes the tensor into a native Java array. Use
-     * this method when you need direct access to the protobuf message or need
-     * to manually handle the tensor data.
-     * </p>
+     * Retrieves the InferOutputTensor protobuf message for a specific output by name.
+     *
+     * <p>This method provides direct access to the raw protobuf message representing
+     * the output tensor. For most use cases, {@link #getOutputAsArray(String)} is more
+     * convenient as it automatically deserializes the tensor into a native Java array.</p>
+     *
+     * <p>Returns {@code null} when this InferResult was constructed via the
+     * protocol-agnostic constructor (HTTP path). Use {@link #getOutputAsArray(String)}
+     * for protocol-independent access to tensor data.</p>
      *
      * @param name the name of the output tensor to retrieve
-     * @return the InferOutputTensor protobuf message with the specified name,
-     * or {@code null} if no tensor with that name exists in the response
+     * @return the InferOutputTensor protobuf message, or {@code null} if not found
+     *         or if this result was constructed without protobuf
      */
     public InferOutputTensor getOutput(String name) {
+        if (result == null) {
+            return null;
+        }
         for (InferOutputTensor output : result.getOutputsList()) {
             if (output.getName().equals(name)) {
                 return output;
@@ -171,14 +314,16 @@ public class InferResult {
 
     /**
      * Retrieves the complete ModelInferResponse protobuf message.
-     * <p>
-     * This method provides access to the entire response message from the
-     * Triton Inference Server, including all output tensors, model metadata,
-     * and any additional response information. This is useful when you need to
-     * access multiple outputs or inspect the complete response structure.
-     * </p>
      *
-     * @return the underlying ModelInferResponse protobuf message; never null
+     * <p>This method provides access to the entire response message from the
+     * Triton Inference Server, including all output tensors, model metadata,
+     * and any additional response information.</p>
+     *
+     * <p>Returns {@code null} when this InferResult was constructed via the
+     * protocol-agnostic constructor (HTTP path).</p>
+     *
+     * @return the underlying ModelInferResponse protobuf message, or {@code null}
+     *         if constructed without protobuf
      */
     public ModelInferResponse getResponse() {
         return result;
@@ -196,7 +341,11 @@ public class InferResult {
      * @throws TritonInferException if buffer contains malformed data
      */
     private Object deserializeRawContent(ByteString rawContent, TritonDataType datatype) {
-        ByteBuffer buffer = rawContent.asReadOnlyByteBuffer().order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer buffer = rawContent.asReadOnlyByteBuffer().order(ByteOrder.LITTLE_ENDIAN);
+        return deserializeRawContentFromBuffer(buffer, datatype);
+    }
+
+    private Object deserializeRawContentFromBuffer(ByteBuffer buffer, TritonDataType datatype) {
         switch (datatype) {
             case BOOL -> {
                 validateBufferSize(buffer, 1, "BOOL");
