@@ -1,7 +1,10 @@
 package com.gencior.triton.core.pojo;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import inference.GrpcService;
 
@@ -34,6 +37,27 @@ public final class TritonTensorMetadata {
             proto.getName(),
             proto.getDatatype(),
             proto.getShapeList()
+        );
+    }
+
+    /**
+     * Creates a TritonTensorMetadata from a JSON response.
+     *
+     * @param json the JSON node containing {@code name}, {@code datatype}, and {@code shape} fields
+     * @return a new TritonTensorMetadata instance
+     */
+    public static TritonTensorMetadata fromJson(JsonNode json) {
+        List<Long> shapeList = new ArrayList<>();
+        JsonNode shapeNode = json.path("shape");
+        if (shapeNode.isArray()) {
+            for (JsonNode dim : shapeNode) {
+                shapeList.add(dim.asLong());
+            }
+        }
+        return new TritonTensorMetadata(
+                json.path("name").asText(""),
+                json.path("datatype").asText(""),
+                shapeList
         );
     }
 

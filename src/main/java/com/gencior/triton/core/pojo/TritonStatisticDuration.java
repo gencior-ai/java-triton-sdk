@@ -1,5 +1,7 @@
 package com.gencior.triton.core.pojo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import inference.GrpcService;
 
 /**
@@ -25,6 +27,19 @@ public final class TritonStatisticDuration {
 
     public static TritonStatisticDuration fromProto(GrpcService.StatisticDuration proto) {
         return new TritonStatisticDuration(proto.getCount(), proto.getNs());
+    }
+
+    /**
+     * Creates a TritonStatisticDuration from a JSON response.
+     *
+     * @param json the JSON node containing {@code count} and {@code ns} fields
+     * @return a new TritonStatisticDuration instance
+     */
+    public static TritonStatisticDuration fromJson(JsonNode json) {
+        return new TritonStatisticDuration(
+                json.path("count").asLong(0),
+                json.path("ns").asLong(0)
+        );
     }
 
     /**
