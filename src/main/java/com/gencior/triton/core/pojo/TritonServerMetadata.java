@@ -1,7 +1,10 @@
 package com.gencior.triton.core.pojo;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import inference.GrpcService;
 
@@ -33,6 +36,27 @@ public final class TritonServerMetadata {
                 response.getName(),
                 response.getVersion(),
                 response.getExtensionsList()
+        );
+    }
+
+    /**
+     * Creates a TritonServerMetadata from a JSON response.
+     *
+     * @param json the JSON node containing {@code name}, {@code version}, and {@code extensions} fields
+     * @return a new TritonServerMetadata instance
+     */
+    public static TritonServerMetadata fromJson(JsonNode json) {
+        List<String> extensions = new ArrayList<>();
+        JsonNode extNode = json.path("extensions");
+        if (extNode.isArray()) {
+            for (JsonNode ext : extNode) {
+                extensions.add(ext.asText());
+            }
+        }
+        return new TritonServerMetadata(
+                json.path("name").asText(""),
+                json.path("version").asText(""),
+                extensions
         );
     }
 

@@ -1,5 +1,7 @@
 package com.gencior.triton.core.pojo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import inference.GrpcService;
 
 /**
@@ -45,6 +47,25 @@ public final class TritonInferResponseStatistics {
                 TritonStatisticDuration.fromProto(proto.getFail()),
                 TritonStatisticDuration.fromProto(proto.getEmptyResponse()),
                 TritonStatisticDuration.fromProto(proto.getCancel())
+        );
+    }
+
+    /**
+     * Creates a TritonInferResponseStatistics from a JSON response.
+     *
+     * @param json the JSON node containing duration fields such as {@code compute_infer},
+     *             {@code compute_output}, {@code success}, {@code fail},
+     *             {@code empty_response}, and {@code cancel}
+     * @return a new TritonInferResponseStatistics instance
+     */
+    public static TritonInferResponseStatistics fromJson(JsonNode json) {
+        return new TritonInferResponseStatistics(
+                TritonStatisticDuration.fromJson(json.path("compute_infer")),
+                TritonStatisticDuration.fromJson(json.path("compute_output")),
+                TritonStatisticDuration.fromJson(json.path("success")),
+                TritonStatisticDuration.fromJson(json.path("fail")),
+                TritonStatisticDuration.fromJson(json.path("empty_response")),
+                TritonStatisticDuration.fromJson(json.path("cancel"))
         );
     }
 

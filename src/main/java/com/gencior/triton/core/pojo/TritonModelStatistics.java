@@ -1,8 +1,13 @@
 package com.gencior.triton.core.pojo;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import inference.GrpcService;
 
@@ -67,6 +72,43 @@ public final class TritonModelStatistics {
                 proto.getExecutionCount(),
                 TritonInferStatistics.fromProto(proto.getInferenceStats()),
                 proto.getMemoryUsageList().stream().map(TritonMemoryUsage::fromProto).collect(Collectors.toList()),
+                responseMap
+        );
+    }
+
+    /**
+     * Creates a TritonModelStatistics from a JSON response.
+     *
+     * @param json the JSON node containing {@code name}, {@code version},
+     *             {@code inference_count}, {@code execution_count}, {@code inference_stats},
+     *             {@code memory_usage}, and {@code response_stats} fields
+     * @return a new TritonModelStatistics instance
+     */
+    public static TritonModelStatistics fromJson(JsonNode json) {
+        List<TritonMemoryUsage> memUsage = new ArrayList<>();
+        JsonNode memNode = json.path("memory_usage");
+        if (memNode.isArray()) {
+            for (JsonNode m : memNode) {
+                memUsage.add(TritonMemoryUsage.fromJson(m));
+            }
+        }
+        Map<String, TritonInferResponseStatistics> responseMap = new HashMap<>();
+        JsonNode respNode = json.path("response_stats");
+        if (respNode.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = respNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                responseMap.put(entry.getKey(), TritonInferResponseStatistics.fromJson(entry.getValue()));
+            }
+        }
+        return new TritonModelStatistics(
+                json.path("name").asText(""),
+                json.path("version").asText(""),
+                json.path("last_inference").asLong(0),
+                json.path("inference_count").asLong(0),
+                json.path("execution_count").asLong(0),
+                TritonInferStatistics.fromJson(json.path("inference_stats")),
+                memUsage,
                 responseMap
         );
     }

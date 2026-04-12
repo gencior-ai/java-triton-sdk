@@ -1,7 +1,11 @@
 package com.gencior.triton.core.pojo;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import inference.ModelConfigOuterClass;
 
@@ -53,6 +57,38 @@ public final class TritonModelConfig {
             proto.getCcModelFilenamesMap(),
             proto.getMetricTagsMap()
         );
+    }
+
+    /**
+     * Creates a TritonModelConfig from a JSON response.
+     *
+     * @param json the JSON node containing model configuration fields such as
+     *             {@code name}, {@code backend}, {@code platform}, {@code max_batch_size}
+     * @return a new TritonModelConfig instance
+     */
+    public static TritonModelConfig fromJson(JsonNode json) {
+        return new TritonModelConfig(
+                json.path("name").asText(""),
+                json.path("platform").asText(""),
+                json.path("backend").asText(""),
+                json.path("runtime").asText(""),
+                json.path("max_batch_size").asInt(0),
+                json.path("default_model_filename").asText(""),
+                parseStringMap(json.path("cc_model_filenames")),
+                parseStringMap(json.path("metric_tags"))
+        );
+    }
+
+    private static Map<String, String> parseStringMap(JsonNode node) {
+        Map<String, String> map = new HashMap<>();
+        if (node.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                map.put(entry.getKey(), entry.getValue().asText(""));
+            }
+        }
+        return map;
     }
 
     /** Returns the name of the model. */

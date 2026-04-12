@@ -1,5 +1,7 @@
 package com.gencior.triton.core.pojo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import inference.GrpcService;
 
 /**
@@ -61,6 +63,22 @@ public final class TritonModelIndex {
                 proto.getVersion(),
                 proto.getState(),
                 proto.getReason()
+        );
+    }
+
+    /**
+     * Creates a TritonModelIndex from a JSON response.
+     *
+     * @param json the JSON node containing {@code name}, {@code version}, {@code state},
+     *             and {@code reason} fields
+     * @return a new TritonModelIndex instance
+     */
+    public static TritonModelIndex fromJson(JsonNode json) {
+        return new TritonModelIndex(
+                json.path("name").asText(""),
+                json.path("version").asText(""),
+                json.path("state").asText(""),
+                json.path("reason").asText("")
         );
     }
 

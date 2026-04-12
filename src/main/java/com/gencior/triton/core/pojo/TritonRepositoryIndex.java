@@ -1,8 +1,11 @@
 package com.gencior.triton.core.pojo;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import inference.GrpcService;
 
@@ -36,7 +39,23 @@ public final class TritonRepositoryIndex {
         List<TritonModelIndex> modelList = response.getModelsList().stream()
                 .map(TritonModelIndex::fromProto)
                 .collect(Collectors.toList());
-        
+
+        return new TritonRepositoryIndex(modelList);
+    }
+
+    /**
+     * Creates a TritonRepositoryIndex from a JSON array response.
+     *
+     * @param json the JSON array node where each element is a model index entry
+     * @return a new TritonRepositoryIndex instance
+     */
+    public static TritonRepositoryIndex fromJson(JsonNode json) {
+        List<TritonModelIndex> modelList = new ArrayList<>();
+        if (json.isArray()) {
+            for (JsonNode model : json) {
+                modelList.add(TritonModelIndex.fromJson(model));
+            }
+        }
         return new TritonRepositoryIndex(modelList);
     }
 

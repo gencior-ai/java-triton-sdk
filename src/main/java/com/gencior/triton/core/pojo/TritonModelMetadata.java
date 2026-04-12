@@ -1,8 +1,11 @@
 package com.gencior.triton.core.pojo;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import inference.GrpcService;
 
@@ -59,6 +62,44 @@ public final class TritonModelMetadata {
             response.getPlatform(),
             inputs,
             outputs
+        );
+    }
+
+    /**
+     * Creates a TritonModelMetadata from a JSON response.
+     *
+     * @param json the JSON node containing {@code name}, {@code versions}, {@code platform},
+     *             {@code inputs}, and {@code outputs} fields
+     * @return a new TritonModelMetadata instance
+     */
+    public static TritonModelMetadata fromJson(JsonNode json) {
+        List<String> versions = new ArrayList<>();
+        JsonNode versionsNode = json.path("versions");
+        if (versionsNode.isArray()) {
+            for (JsonNode v : versionsNode) {
+                versions.add(v.asText());
+            }
+        }
+        List<TritonTensorMetadata> inputs = new ArrayList<>();
+        JsonNode inputsNode = json.path("inputs");
+        if (inputsNode.isArray()) {
+            for (JsonNode input : inputsNode) {
+                inputs.add(TritonTensorMetadata.fromJson(input));
+            }
+        }
+        List<TritonTensorMetadata> outputs = new ArrayList<>();
+        JsonNode outputsNode = json.path("outputs");
+        if (outputsNode.isArray()) {
+            for (JsonNode output : outputsNode) {
+                outputs.add(TritonTensorMetadata.fromJson(output));
+            }
+        }
+        return new TritonModelMetadata(
+                json.path("name").asText(""),
+                versions,
+                json.path("platform").asText(""),
+                inputs,
+                outputs
         );
     }
 

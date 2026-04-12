@@ -1,5 +1,7 @@
 package com.gencior.triton.core.pojo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import inference.GrpcService;
 
 /**
@@ -48,6 +50,20 @@ public final class TritonMemoryUsage {
      */
     public static TritonMemoryUsage fromProto(GrpcService.MemoryUsage proto) {
         return new TritonMemoryUsage(proto.getType(), proto.getId(), proto.getByteSize());
+    }
+
+    /**
+     * Creates a TritonMemoryUsage from a JSON response.
+     *
+     * @param json the JSON node containing {@code type}, {@code id}, and {@code byte_size} fields
+     * @return a new TritonMemoryUsage instance
+     */
+    public static TritonMemoryUsage fromJson(JsonNode json) {
+        return new TritonMemoryUsage(
+                json.path("type").asText(""),
+                json.path("id").asLong(0),
+                json.path("byte_size").asLong(0)
+        );
     }
 
     /**

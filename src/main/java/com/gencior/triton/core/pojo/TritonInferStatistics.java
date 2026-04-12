@@ -1,5 +1,7 @@
 package com.gencior.triton.core.pojo;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import inference.GrpcService;
 
 /**
@@ -48,6 +50,27 @@ public final class TritonInferStatistics {
             TritonStatisticDuration.fromProto(proto.getComputeOutput()),
             TritonStatisticDuration.fromProto(proto.getCacheHit()),
             TritonStatisticDuration.fromProto(proto.getCacheMiss())
+        );
+    }
+
+    /**
+     * Creates a TritonInferStatistics from a JSON response.
+     *
+     * @param json the JSON node containing duration fields such as {@code success},
+     *             {@code fail}, {@code queue}, {@code compute_input}, {@code compute_infer},
+     *             {@code compute_output}, {@code cache_hit}, and {@code cache_miss}
+     * @return a new TritonInferStatistics instance
+     */
+    public static TritonInferStatistics fromJson(JsonNode json) {
+        return new TritonInferStatistics(
+                TritonStatisticDuration.fromJson(json.path("success")),
+                TritonStatisticDuration.fromJson(json.path("fail")),
+                TritonStatisticDuration.fromJson(json.path("queue")),
+                TritonStatisticDuration.fromJson(json.path("compute_input")),
+                TritonStatisticDuration.fromJson(json.path("compute_infer")),
+                TritonStatisticDuration.fromJson(json.path("compute_output")),
+                TritonStatisticDuration.fromJson(json.path("cache_hit")),
+                TritonStatisticDuration.fromJson(json.path("cache_miss"))
         );
     }
 
